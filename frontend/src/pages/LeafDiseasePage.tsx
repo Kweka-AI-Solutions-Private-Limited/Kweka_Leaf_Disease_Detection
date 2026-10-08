@@ -586,85 +586,175 @@ export const LeafDiseasePage: React.FC = () => {
               </span>
             </div>
 
-            {/* Drop Zone */}
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault();
-                if (e.dataTransfer.files) {
-                  addFiles(Array.from(e.dataTransfer.files));
-                }
-              }}
-              className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all ${selectedFiles.length >= 5
-                ? 'border-industrial-300 bg-industrial-50 opacity-60 cursor-not-allowed'
-                : 'border-industrial-300 hover:border-[#d96b27] hover:bg-[#fdf3ed]/50 bg-industrial-50/50'
-                }`}
-            >
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                accept="image/jpeg,image/png,image/webp"
-                multiple
-                className="hidden"
-                disabled={selectedFiles.length >= 5}
-              />
-              <div className="flex flex-col items-center space-y-2">
-                <div className="p-3 rounded-full bg-[#fdeade] text-[#d96b27]">
-                  <Upload className="w-6 h-6" />
+            {/* Image Upload Box & Selected Previews Layout */}
+            {previewUrls.length > 1 ? (
+              /* Multiple Images Layout: Dropzone on top, Previews stacked BELOW */
+              <div className="space-y-3">
+                {/* Drop Zone */}
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (e.dataTransfer.files) {
+                      addFiles(Array.from(e.dataTransfer.files));
+                    }
+                  }}
+                  className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all flex flex-col items-center justify-center ${selectedFiles.length >= 5
+                    ? 'border-industrial-300 bg-industrial-50 opacity-60 cursor-not-allowed'
+                    : 'border-industrial-300 hover:border-[#d96b27] hover:bg-[#fdf3ed]/50 bg-industrial-50/50'
+                    }`}
+                >
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    accept="image/jpeg,image/png,image/webp"
+                    multiple
+                    className="hidden"
+                    disabled={selectedFiles.length >= 5}
+                  />
+                  <div className="flex flex-col items-center space-y-1.5">
+                    <div className="p-2.5 rounded-full bg-[#fdeade] text-[#d96b27]">
+                      <Upload className="w-5 h-5" />
+                    </div>
+                    <p className="text-xs font-bold text-industrial-800">
+                      Click or Drag & Drop Leaf Images
+                    </p>
+                    <p className="text-[10px] text-industrial-500 font-mono">
+                      JPEG, PNG, WEBP • Max 10MB
+                    </p>
+                  </div>
                 </div>
-                <p className="text-sm font-bold text-industrial-800">
-                  Click or Drag & Drop Leaf Images
-                </p>
-                <p className="text-xs text-industrial-500 font-mono">
-                  JPEG, PNG, WEBP • Max 10MB per file
-                </p>
-              </div>
-            </div>
 
-            {/* Previews */}
-            {previewUrls.length > 0 && (
-              <div className="space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-industrial-700 uppercase tracking-wider font-mono">
-                    Selected Previews
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleClearAll}
-                    className="text-xs text-reject-600 hover:text-reject-700 font-semibold"
-                  >
-                    Clear All
-                  </button>
-                </div>
-                <div className="grid grid-cols-4 gap-2">
-                  {previewUrls.map((url, idx) => (
-                    <div
-                      key={idx}
-                      className="relative group rounded-lg overflow-hidden border border-industrial-200 aspect-square bg-industrial-900"
+                {/* Previews (Below Dropzone for Multiple Images) */}
+                <div className="space-y-2 p-3 rounded-xl bg-industrial-50 border border-industrial-200">
+                  <div className="flex items-center justify-between pb-1 border-b border-industrial-200/60">
+                    <span className="text-xs font-extrabold text-industrial-700 uppercase tracking-wider font-mono">
+                      Selected Previews ({previewUrls.length})
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleClearAll}
+                      className="text-xs text-reject-600 hover:text-reject-700 font-bold whitespace-nowrap shrink-0 hover:underline"
                     >
-                      <img
-                        src={url}
-                        alt={`Leaf preview ${idx + 1}`}
-                        className="w-full h-full object-cover"
-                      />
+                      Clear All
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2 max-h-56 overflow-y-auto p-0.5">
+                    {previewUrls.map((url, idx) => (
+                      <div
+                        key={idx}
+                        className="relative group rounded-lg overflow-hidden border border-industrial-200 aspect-square bg-industrial-900 shadow-sm"
+                      >
+                        <img
+                          src={url}
+                          alt={`Leaf preview ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveImage(idx);
+                          }}
+                          className="absolute top-1 right-1 bg-industrial-900/80 hover:bg-reject-600 text-white p-1 rounded-full opacity-90 transition-colors z-10"
+                          title="Remove image"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                        <span className="absolute bottom-1 left-1 bg-industrial-950/80 text-white font-mono text-[9px] px-1.5 py-0.5 rounded font-bold">
+                          #{idx + 1}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* Single or Zero Image Layout: Side-by-Side if 1 image, Full-width if 0 */
+              <div className={`grid gap-3 ${previewUrls.length === 1 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+                {/* Previews (Side-by-side for 1 image) */}
+                {previewUrls.length === 1 && (
+                  <div className="space-y-2 p-2.5 rounded-xl bg-industrial-50 border border-industrial-200 flex flex-col justify-between">
+                    <div className="flex items-center justify-between gap-1 pb-1 border-b border-industrial-200/60">
+                      <span className="text-[9.5px] font-extrabold text-industrial-700 uppercase tracking-tight font-mono whitespace-nowrap truncate">
+                        Previews (1)
+                      </span>
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRemoveImage(idx);
-                        }}
-                        className="absolute top-1 right-1 bg-industrial-900/80 hover:bg-reject-600 text-white p-1 rounded-full opacity-90 transition-colors"
-                        title="Remove image"
+                        onClick={handleClearAll}
+                        className="text-[9.5px] text-reject-600 hover:text-reject-700 font-bold whitespace-nowrap shrink-0 hover:underline"
                       >
-                        <X className="w-3 h-3" />
+                        Clear All
                       </button>
-                      <span className="absolute bottom-1 left-1 bg-industrial-950/80 text-white font-mono text-[9px] px-1 py-0.5 rounded">
-                        #{idx + 1}
-                      </span>
                     </div>
-                  ))}
+                    <div className="p-0.5">
+                      {previewUrls.map((url, idx) => (
+                        <div
+                          key={idx}
+                          className="relative group rounded-lg overflow-hidden border border-industrial-200 bg-industrial-900 shadow-sm h-32 w-full"
+                        >
+                          <img
+                            src={url}
+                            alt={`Leaf preview ${idx + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveImage(idx);
+                            }}
+                            className="absolute top-1 right-1 bg-industrial-900/80 hover:bg-reject-600 text-white p-1 rounded-full opacity-90 transition-colors z-10"
+                            title="Remove image"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                          <span className="absolute bottom-1 left-1 bg-industrial-950/80 text-white font-mono text-[9px] px-1.5 py-0.5 rounded font-bold">
+                            #{idx + 1}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Drop Zone */}
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (e.dataTransfer.files) {
+                      addFiles(Array.from(e.dataTransfer.files));
+                    }
+                  }}
+                  className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all flex flex-col items-center justify-center min-h-[140px] ${selectedFiles.length >= 5
+                    ? 'border-industrial-300 bg-industrial-50 opacity-60 cursor-not-allowed'
+                    : 'border-industrial-300 hover:border-[#d96b27] hover:bg-[#fdf3ed]/50 bg-industrial-50/50'
+                    }`}
+                >
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    accept="image/jpeg,image/png,image/webp"
+                    multiple
+                    className="hidden"
+                    disabled={selectedFiles.length >= 5}
+                  />
+                  <div className="flex flex-col items-center space-y-2">
+                    <div className="p-3 rounded-full bg-[#fdeade] text-[#d96b27]">
+                      <Upload className="w-6 h-6" />
+                    </div>
+                    <p className="text-xs font-bold text-industrial-800">
+                      Click or Drag & Drop Leaf Images
+                    </p>
+                    <p className="text-[10px] text-industrial-500 font-mono">
+                      JPEG, PNG, WEBP • Max 10MB
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
@@ -722,125 +812,6 @@ export const LeafDiseasePage: React.FC = () => {
               </div>
             )}
           </Card>
-
-          {/* AI Agronomist Feedback & Model Tuning Card (Visible ONLY after executing an analysis run) */}
-          {analysisResult && (
-            <Card className="p-5 bg-white border-industrial-200 space-y-4 shadow-sm animate-in fade-in">
-              <div className="flex items-center justify-between border-b border-industrial-100 pb-2.5">
-                <div className="flex items-center space-x-2">
-                  <MessageSquare className="w-4.5 h-4.5 text-[#d96b27]" />
-                  <h3 className="text-xs font-extrabold text-industrial-900 uppercase font-mono tracking-wider">
-                    AI Agronomist Feedback
-                  </h3>
-                </div>
-                <span className="px-2 py-0.5 rounded bg-[#fdeade] text-[#b85119] text-[10px] font-mono font-bold uppercase">
-                  Model Tuning
-                </span>
-              </div>
-
-              <p className="text-xs text-industrial-600 font-medium leading-relaxed">
-                Provide feedback on this diagnosis to help tune Gemini AI pathology algorithms and improve crop recognition.
-              </p>
-
-              {feedbackSubmitted ? (
-                <div className="p-4 rounded-xl bg-[#fdf3ed] border border-[#f5d5c0] text-center space-y-2">
-                  <CheckCircle2 className="w-6 h-6 text-[#d96b27] mx-auto" />
-                  <p className="text-xs font-bold text-[#8f390e]">Feedback Submitted!</p>
-                  <p className="text-[11px] text-[#b85119] font-mono">
-                    Logged into dataset tuning pipeline for Gemini plant vision models.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFeedbackSubmitted(false);
-                      setFeedbackRating(null);
-                      setFeedbackComments('');
-                    }}
-                    className="text-[11px] font-bold text-[#b85119] underline hover:text-[#8f390e] pt-1"
-                  >
-                    Submit Additional Feedback
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {/* Thumbs Up / Down */}
-                  <div className="flex items-center justify-center space-x-3">
-                    <button
-                      type="button"
-                      onClick={() => setFeedbackRating('UP')}
-                      className={`flex-1 py-2 px-3 rounded-xl border flex items-center justify-center space-x-2 text-xs font-mono font-bold transition-all ${feedbackRating === 'UP'
-                        ? 'bg-[#d96b27] text-white border-[#b85119] shadow-sm'
-                        : 'bg-industrial-50 border-industrial-200 text-industrial-700 hover:bg-[#fdf3ed] hover:border-[#f5d5c0]'
-                        }`}
-                    >
-                      <ThumbsUp className="w-4 h-4" />
-                      <span>Accurate AI</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFeedbackRating('DOWN')}
-                      className={`flex-1 py-2 px-3 rounded-xl border flex items-center justify-center space-x-2 text-xs font-mono font-bold transition-all ${feedbackRating === 'DOWN'
-                        ? 'bg-reject-600 text-white border-reject-700 shadow-sm'
-                        : 'bg-industrial-50 border-industrial-200 text-industrial-700 hover:bg-reject-50 hover:border-reject-300'
-                        }`}
-                    >
-                      <ThumbsDown className="w-4 h-4" />
-                      <span>Needs Tuning</span>
-                    </button>
-                  </div>
-
-                  {/* Category Select */}
-                  <div className="space-y-1">
-                    <label className="block text-[10px] font-mono font-extrabold text-industrial-600 uppercase">
-                      Feedback Category
-                    </label>
-                    <select
-                      value={feedbackCategory}
-                      onChange={(e) => setFeedbackCategory(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl border border-industrial-300 text-xs font-medium text-industrial-900 bg-white focus:ring-2 focus:ring-[#d96b27] focus:outline-none"
-                    >
-                      <option value="DIAGNOSIS_CORRECT">Diagnosis & Crop Correct</option>
-                      <option value="INCORRECT_CROP">Incorrect Plant Species Identified</option>
-                      <option value="INCORRECT_PATHOLOGY">Incorrect Pathology / Disease</option>
-                      <option value="TREATMENT_HELPFUL">NACL Recommendations Helpful</option>
-                      <option value="OTHER">General Feedback / Edge Case</option>
-                    </select>
-                  </div>
-
-                  {/* Comments */}
-                  <div className="space-y-1">
-                    <label className="block text-[10px] font-mono font-extrabold text-industrial-600 uppercase">
-                      Agronomist Notes / Actual Crop
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={feedbackComments}
-                      onChange={(e) => setFeedbackComments(e.target.value)}
-                      placeholder="E.g. Actual plant is Cucumber, symptoms match Powdery Mildew..."
-                      className="w-full px-3 py-2 rounded-xl border border-industrial-300 text-xs text-industrial-900 focus:ring-2 focus:ring-[#d96b27] focus:outline-none resize-none font-sans"
-                    />
-                  </div>
-
-                  {/* Submit Button */}
-                  <button
-                    type="button"
-                    onClick={handleSendFeedback}
-                    disabled={isSubmittingFeedback}
-                    className="w-full py-2.5 px-3 rounded-xl bg-[#d96b27] hover:bg-[#c55d1d] text-white text-xs font-extrabold flex items-center justify-center space-x-1.5 transition-all shadow-sm"
-                  >
-                    {isSubmittingFeedback ? (
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <>
-                        <Send className="w-3.5 h-3.5" />
-                        <span>Submit Agronomist Feedback</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              )}
-            </Card>
-          )}
         </div>
 
         {/* Right Column: Diagnostic Result Dashboard (8 cols) */}
@@ -863,59 +834,101 @@ export const LeafDiseasePage: React.FC = () => {
 
           {analysisResult && (
             <div className="space-y-4">
-              {/* Status Header */}
-              <Card className="p-4 bg-white border-industrial-200 shadow-sm flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center space-x-3">
-                  <span
-                    className={`px-3 py-1 rounded-full text-xs font-mono font-bold tracking-wider uppercase ${analysisResult.status === 'SUCCESS'
-                      ? 'bg-pass-100 text-pass-800 border border-pass-300'
-                      : analysisResult.status === 'UNCERTAIN'
-                        ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                        : 'bg-reject-100 text-reject-800 border border-reject-300'
-                      }`}
-                  >
-                    STATUS: {analysisResult.status}
-                  </span>
-                  <span className="text-xs text-industrial-500 font-mono font-bold">
-                    ID: {analysisResult.analysis_id}
+              {/* Unified Status Header & Evidence Validation */}
+              <Card className="p-4 bg-white border-industrial-200 shadow-sm space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center space-x-3">
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-mono font-bold tracking-wider uppercase ${analysisResult.status === 'SUCCESS'
+                        ? 'bg-pass-100 text-pass-800 border border-pass-300'
+                        : analysisResult.status === 'UNCERTAIN'
+                          ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                          : 'bg-reject-100 text-reject-800 border border-reject-300'
+                        }`}
+                    >
+                      STATUS: {analysisResult.status}
+                    </span>
+                    <span className="text-xs text-industrial-500 font-mono font-bold">
+                      ID: {analysisResult.analysis_id}
+                    </span>
+                    {analysisResult.diagnosis && (
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase ${analysisResult.diagnosis.evidence_level === 'HIGH'
+                          ? 'bg-pass-100 text-pass-800 border border-pass-300'
+                          : analysisResult.diagnosis.evidence_level === 'MEDIUM'
+                            ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                            : 'bg-reject-100 text-reject-800 border border-reject-300'
+                          }`}
+                      >
+                        EVIDENCE: {analysisResult.diagnosis.evidence_level}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-xs text-industrial-400 font-mono">
+                    {new Date(analysisResult.timestamp).toLocaleString()}
                   </span>
                 </div>
-                <span className="text-xs text-industrial-400 font-mono">
-                  {new Date(analysisResult.timestamp).toLocaleString()}
-                </span>
+
+                {/* Evidence Validation Metrics Breakdown */}
+                {analysisResult.diagnosis && (
+                  <div className="pt-2.5 border-t border-industrial-100 space-y-2">
+                    <div className="flex items-center space-x-1.5">
+                      <FileCheck className="w-3.5 h-3.5 text-[#d96b27]" />
+                      <span className="text-[11px] font-extrabold text-industrial-800 font-mono uppercase tracking-wider">
+                        Diagnosis Evidence Validation
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-center font-mono text-xs">
+                      <div className="p-2 rounded-xl bg-industrial-50 border border-industrial-200">
+                        <span className="text-industrial-400 font-bold block text-[9px]">IMAGE QUALITY</span>
+                        <span className="font-extrabold text-industrial-900 text-xs">{analysisResult.diagnosis.image_quality_status}</span>
+                      </div>
+                      <div className="p-2 rounded-xl bg-industrial-50 border border-industrial-200">
+                        <span className="text-industrial-400 font-bold block text-[9px]">CROP COMPATIBILITY</span>
+                        <span className="font-extrabold text-industrial-900 text-xs">{analysisResult.diagnosis.crop_compatibility_status}</span>
+                      </div>
+                      <div className="p-2 rounded-xl bg-industrial-50 border border-industrial-200">
+                        <span className="text-industrial-400 font-bold block text-[9px]">CONSISTENCY</span>
+                        <span className="font-extrabold text-industrial-900 text-xs">{analysisResult.diagnosis.consistency_status}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </Card>
 
               {/* Crop & Disease Result Cards Side-by-Side */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Crop Card */}
-                <Card className="p-5 bg-white border-industrial-200 space-y-3 shadow-sm">
-                  <div className="flex items-center justify-between border-b border-industrial-100 pb-2">
-                    <span className="text-xs font-extrabold text-industrial-500 uppercase tracking-wider font-mono flex items-center space-x-1.5">
-                      <Sprout className="w-4 h-4 text-[#d96b27]" />
-                      <span>Identified Crop Species</span>
-                    </span>
-                    <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${analysisResult.crop.status === 'CONFIRMED'
-                        ? 'bg-[#fdeade] text-[#b85119]'
-                        : 'bg-amber-100 text-amber-800'
-                        }`}
-                    >
-                      {analysisResult.crop.status}
-                    </span>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xl font-extrabold text-industrial-900">
-                      {analysisResult.crop.crop_name}
+                <Card className="p-5 bg-white border-industrial-200 space-y-3 shadow-sm flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between border-b border-industrial-100 pb-2">
+                      <span className="text-xs font-extrabold text-industrial-500 uppercase tracking-wider font-mono flex items-center space-x-1.5">
+                        <Sprout className="w-4 h-4 text-[#d96b27]" />
+                        <span>Identified Crop Species</span>
+                      </span>
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${analysisResult.crop.status === 'CONFIRMED'
+                          ? 'bg-[#fdeade] text-[#b85119]'
+                          : 'bg-amber-100 text-amber-800'
+                          }`}
+                      >
+                        {analysisResult.crop.status}
+                      </span>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xl font-extrabold text-industrial-900">
+                        {analysisResult.crop.crop_name}
+                      </p>
+                      <p className="text-xs text-industrial-500 font-mono">
+                        Source: {analysisResult.crop.source}
+                      </p>
+                    </div>
+                    <p className="text-xs text-industrial-600 leading-relaxed font-medium bg-industrial-50 p-2.5 rounded-lg border border-industrial-100">
+                      {analysisResult.crop.evidence_note}
                     </p>
-                    <p className="text-xs text-industrial-500 font-mono">
-                      Source: {analysisResult.crop.source}
-                    </p>
                   </div>
-                  <p className="text-xs text-industrial-600 leading-relaxed font-medium bg-industrial-50 p-2.5 rounded-lg border border-industrial-100">
-                    {analysisResult.crop.evidence_note}
-                  </p>
 
-                  {/* Interactive Crop Species Selection Dropdown (Prompted when Gemini confidence is uncertain) */}
+                  {/* Interactive Crop Species Selection Dropdown */}
                   {(analysisResult.crop.status === 'UNCERTAIN' ||
                     analysisResult.diagnosis?.is_uncertain ||
                     analysisResult.crop.crop_name === 'Unknown') && (
@@ -927,7 +940,7 @@ export const LeafDiseasePage: React.FC = () => {
                               Suggested Action: Select Plant Species
                             </p>
                             <p className="text-amber-800 leading-normal font-medium">
-                              Auto-detect confidence is low. Please select the exact crop species below to confirm diagnosis and unlock verified NACL agrochemical recommendations:
+                              Auto-detect confidence is low. Select crop species below to re-diagnose &amp; unlock verified NACL products:
                             </p>
                           </div>
                         </div>
@@ -961,278 +974,371 @@ export const LeafDiseasePage: React.FC = () => {
                 </Card>
 
                 {/* Disease Card */}
-                <Card className="p-5 bg-white border-industrial-200 space-y-3 shadow-sm">
-                  <div className="flex items-center justify-between border-b border-industrial-100 pb-2">
-                    <span className="text-xs font-extrabold text-industrial-500 uppercase tracking-wider font-mono flex items-center space-x-1.5">
-                      <Cpu className="w-4 h-4 text-[#d96b27]" />
-                      <span>Diagnosed Pathology</span>
-                    </span>
-                    {analysisResult.disease?.is_mock && (
-                      <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-mono font-bold uppercase">
-                        MOCK PROVIDER
+                <Card className="p-5 bg-white border-industrial-200 space-y-3 shadow-sm flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between border-b border-industrial-100 pb-2">
+                      <span className="text-xs font-extrabold text-industrial-500 uppercase tracking-wider font-mono flex items-center space-x-1.5">
+                        <Cpu className="w-4 h-4 text-[#d96b27]" />
+                        <span>Diagnosed Pathology</span>
                       </span>
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xl font-extrabold text-industrial-900">
-                      {analysisResult.disease?.disease_name || 'No Pathology Detected'}
-                    </p>
-                    <div className="flex items-center justify-between text-xs text-industrial-500 font-mono">
-                      <span>Provider: {analysisResult.disease?.provider_name}</span>
-                      {analysisResult.disease?.confidence && (
-                        <span className="font-bold text-industrial-800">
-                          Conf: {(analysisResult.disease.confidence * 100).toFixed(0)}%
+                      {analysisResult.disease?.is_mock && (
+                        <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-mono font-bold uppercase">
+                          MOCK PROVIDER
                         </span>
                       )}
                     </div>
-                  </div>
-                  {analysisResult.disease?.candidates && analysisResult.disease.candidates.length > 0 && (
-                    <div className="space-y-1 pt-1 border-t border-industrial-100">
-                      <p className="text-[10px] font-mono font-bold text-industrial-500 uppercase">
-                        Candidates:
+                    <div className="space-y-1">
+                      <p className="text-xl font-extrabold text-industrial-900">
+                        {analysisResult.disease?.disease_name || 'No Pathology Detected'}
                       </p>
-                      {analysisResult.disease.candidates.map((c, i) => (
-                        <div key={i} className="flex justify-between text-xs font-mono text-industrial-600">
-                          <span>• {c.disease_name}</span>
-                          <span>{c.confidence ? `${(c.confidence * 100).toFixed(0)}%` : ''}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </Card>
-              </div>
-
-              {/* Diagnosis Evidence Validation */}
-              {analysisResult.diagnosis && (
-                <Card className="p-4 bg-white border-industrial-200 space-y-2.5 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <FileCheck className="w-4 h-4 text-[#d96b27]" />
-                      <h3 className="text-xs font-extrabold text-industrial-900 font-mono uppercase tracking-wider">
-                        Diagnosis Evidence Validation
-                      </h3>
-                    </div>
-                    <span
-                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase ${analysisResult.diagnosis.evidence_level === 'HIGH'
-                        ? 'bg-pass-100 text-pass-800 border border-pass-300'
-                        : analysisResult.diagnosis.evidence_level === 'MEDIUM'
-                          ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                          : 'bg-reject-100 text-reject-800 border border-reject-300'
-                        }`}
-                    >
-                      EVIDENCE: {analysisResult.diagnosis.evidence_level}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 text-center font-mono text-xs">
-                    <div className="p-2 rounded-xl bg-industrial-50 border border-industrial-200">
-                      <span className="text-industrial-400 font-bold block text-[9px]">IMAGE QUALITY</span>
-                      <span className="font-extrabold text-industrial-900 text-xs">{analysisResult.diagnosis.image_quality_status}</span>
-                    </div>
-                    <div className="p-2 rounded-xl bg-industrial-50 border border-industrial-200">
-                      <span className="text-industrial-400 font-bold block text-[9px]">CROP COMPATIBILITY</span>
-                      <span className="font-extrabold text-industrial-900 text-xs">{analysisResult.diagnosis.crop_compatibility_status}</span>
-                    </div>
-                    <div className="p-2 rounded-xl bg-industrial-50 border border-industrial-200">
-                      <span className="text-industrial-400 font-bold block text-[9px]">CONSISTENCY</span>
-                      <span className="font-extrabold text-industrial-900 text-xs">{analysisResult.diagnosis.consistency_status}</span>
-                    </div>
-                  </div>
-                </Card>
-              )}
-
-              {/* MAIN TREATMENT & NACL AGROCHEMICAL RECOMMENDATIONS SECTION */}
-              {naclRecs && (
-                <div className="space-y-4 pt-2 border-t border-industrial-200 animate-in fade-in">
-                  {/* Section Header */}
-                  <div className="flex items-center justify-between flex-wrap gap-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="p-2.5 rounded-2xl bg-[#fdeade] text-[#b85119] border border-[#f5d5c0]">
-                        <FlaskConical className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-extrabold text-industrial-900 tracking-tight">
-                          NACL Agrochemical Treatment Advisory
-                        </h3>
-                        <p className="text-xs text-industrial-500 font-mono">
-                          RAG Database Match • Active Ingredient Chemistry • Gemini AI Advisory
-                        </p>
-                      </div>
-                    </div>
-                    <span className="px-3.5 py-1.5 rounded-full bg-[#fdeade] text-[#b85119] text-xs font-mono font-extrabold border border-[#f5d5c0]">
-                      {naclRecs.recommendations.length} Recommended Products
-                    </span>
-                  </div>
-
-                  {/* Gemini AI Agronomist Advisory Card */}
-                  <Card
-                    className={`p-5 rounded-2xl shadow-sm space-y-3.5 border ${analysisResult?.diagnosis?.crop_compatibility_status === 'MISMATCHED_HOST' || naclRecs.safety_disclaimer?.includes('CAUTION')
-                      ? 'bg-amber-50/60 border-amber-200'
-                      : 'bg-white border-industrial-200'
-                      }`}
-                  >
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <div className="flex items-center space-x-2.5">
-                        <div
-                          className={`p-2 rounded-xl border ${analysisResult?.diagnosis?.crop_compatibility_status === 'MISMATCHED_HOST' || naclRecs.safety_disclaimer?.includes('CAUTION')
-                            ? 'bg-amber-100 text-amber-800 border-amber-300'
-                            : 'bg-[#fdeade] text-[#d96b27] border-[#f5d5c0]'
-                            }`}
-                        >
-                          {analysisResult?.diagnosis?.crop_compatibility_status === 'MISMATCHED_HOST' || naclRecs.safety_disclaimer?.includes('CAUTION') ? (
-                            <AlertCircle className="w-5 h-5 text-amber-600" />
-                          ) : (
-                            <Sparkles className="w-5 h-5" />
-                          )}
-                        </div>
-                        <div>
-                          <h4
-                            className={`text-sm font-extrabold font-mono uppercase tracking-wider ${analysisResult?.diagnosis?.crop_compatibility_status === 'MISMATCHED_HOST' || naclRecs.safety_disclaimer?.includes('CAUTION')
-                              ? 'text-amber-950'
-                              : 'text-industrial-900'
-                              }`}
-                          >
-                            {analysisResult?.diagnosis?.crop_compatibility_status === 'MISMATCHED_HOST'
-                              ? 'Host Caution & Advisory'
-                              : 'Gemini AI Agronomist Advisory'}
-                          </h4>
-                          <p className="text-[11px] text-industrial-500 font-mono">
-                            Personalized chemical action guide for {naclRecs.crop_name} protection
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div
-                      className={`p-3.5 rounded-xl text-xs leading-relaxed font-medium border ${analysisResult?.diagnosis?.crop_compatibility_status === 'MISMATCHED_HOST' || naclRecs.safety_disclaimer?.includes('CAUTION')
-                        ? 'bg-amber-100/60 border-amber-300 text-amber-900'
-                        : 'bg-industrial-50 border-industrial-100 text-industrial-800'
-                        }`}
-                    >
-                      {naclRecs.ai_advisory_summary}
-                    </div>
-
-                    {/* Active Ingredients Chips */}
-                    {naclRecs.recommended_active_ingredients.length > 0 && (
-                      <div className="flex items-center space-x-2 flex-wrap gap-2 pt-0.5">
-                        <span className="text-xs font-mono font-extrabold text-industrial-600 uppercase">
-                          Target Chemistry:
-                        </span>
-                        {naclRecs.recommended_active_ingredients.map((ai, idx) => (
-                          <span
-                            key={idx}
-                            className="px-2.5 py-0.5 rounded-lg bg-[#fdf3ed] border border-[#f5d5c0] text-[#b85119] text-xs font-mono font-bold"
-                          >
-                            {ai}
+                      <div className="flex items-center justify-between text-xs text-industrial-500 font-mono">
+                        <span>Provider: {analysisResult.disease?.provider_name}</span>
+                        {analysisResult.disease?.confidence && (
+                          <span className="font-bold text-industrial-800">
+                            Conf: {(analysisResult.disease.confidence * 100).toFixed(0)}%
                           </span>
+                        )}
+                      </div>
+                    </div>
+                    {analysisResult.disease?.candidates && analysisResult.disease.candidates.length > 0 && (
+                      <div className="space-y-1 pt-1 border-t border-industrial-100">
+                        <p className="text-[10px] font-mono font-bold text-industrial-500 uppercase">
+                          Candidates:
+                        </p>
+                        {analysisResult.disease.candidates.map((c, i) => (
+                          <div key={i} className="flex justify-between text-xs font-mono text-industrial-600">
+                            <span>• {c.disease_name}</span>
+                            <span>{c.confidence ? `${(c.confidence * 100).toFixed(0)}%` : ''}</span>
+                          </div>
                         ))}
                       </div>
                     )}
-                  </Card>
-
-                  {/* Multi-Column NACL Product Cards Grid */}
-                  {naclRecs.recommendations.length > 0 && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {naclRecs.recommendations.map((prod, idx) => (
-                        <Card
-                          key={idx}
-                          className="p-4 bg-white border border-industrial-200 hover:border-[#d96b27] transition-all shadow-sm hover:shadow-md space-y-3 flex flex-col justify-between"
-                        >
-                          <div className="space-y-2.5">
-                            {/* Title & Category Row */}
-                            <div className="flex items-start justify-between gap-2 border-b border-industrial-100 pb-2">
-                              <div>
-                                <h4 className="text-base font-extrabold text-industrial-900">
-                                  {prod.product_name}
-                                </h4>
-                                <span className="px-2 py-0.5 rounded bg-industrial-100 text-industrial-800 text-[10px] font-mono font-bold uppercase">
-                                  {prod.category}
-                                </span>
-                              </div>
-
-                              <span className="px-2 py-0.5 rounded text-[9px] font-mono font-extrabold border bg-[#fdeade] text-[#b85119] border-[#f5d5c0]">
-                                NACL PRODUCT
-                              </span>
-                            </div>
-
-                            {/* Active Ingredient & FRAC Group */}
-                            {(prod.active_ingredient || prod.frac_group) && (
-                              <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-[#fdf3ed]/80 border border-[#f5d5c0]/60 text-xs font-mono text-[#b85119] font-extrabold">
-                                <span className="truncate">Active: {prod.active_ingredient || 'Formulated Agrochemical'}</span>
-                                {prod.frac_group && (
-                                  <span className="px-1.5 py-0.5 rounded bg-[#fdeade] text-[#8f390e] text-[9px] shrink-0">
-                                    {prod.frac_group}
-                                  </span>
-                                )}
-                              </div>
-                            )}
-
-                            {/* Rationale */}
-                            <p className="text-xs text-industrial-700 bg-industrial-50 p-2.5 rounded-xl border border-industrial-100 leading-relaxed font-medium">
-                              {prod.match_rationale}
-                            </p>
-
-                            {/* Dosage & Pack Sizes */}
-                            <div className="space-y-1.5 text-xs font-mono">
-                              <div className="p-2 rounded-xl bg-industrial-50 border border-industrial-200 space-y-0.5">
-                                <div className="flex items-center justify-between text-[9px]">
-                                  <span className="text-industrial-500 font-extrabold uppercase">
-                                    RECOMMENDED DOSAGE
-                                  </span>
-                                </div>
-                                <span className="text-industrial-900 font-bold block text-xs">
-                                  {prod.recommended_dosage}
-                                </span>
-                              </div>
-
-                              {prod.pack_sizes && prod.pack_sizes.length > 0 && (
-                                <div className="space-y-0.5">
-                                  <span className="text-[9px] text-industrial-500 font-extrabold block uppercase">
-                                    PACK SIZES:
-                                  </span>
-                                  <div className="flex flex-wrap gap-1">
-                                    {prod.pack_sizes.map((ps, pidx) => (
-                                      <span
-                                        key={pidx}
-                                        className="px-1.5 py-0.2 rounded bg-industrial-100 text-industrial-800 text-[9px] font-bold"
-                                      >
-                                        {ps}
-                                      </span>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Direct NACL Product Link Button */}
-                          <div className="pt-2 border-t border-industrial-100">
-                            <a
-                              href={prod.product_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="w-full inline-flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl bg-[#d96b27] hover:bg-[#c55d1d] text-white text-xs font-extrabold transition-all shadow-sm"
-                            >
-                              <span>View NACL Product Details</span>
-                              <ExternalLink className="w-3.5 h-3.5" />
-                            </a>
-                          </div>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Safety Disclaimer */}
-                  <div className="p-3.5 rounded-xl bg-industrial-100 border border-industrial-200 text-xs text-industrial-600 flex items-start space-x-2.5 font-mono">
-                    <ShieldCheck className="w-4 h-4 text-[#d96b27] flex-shrink-0 mt-0.5" />
-                    <span>{naclRecs.safety_disclaimer}</span>
                   </div>
-                </div>
-              )}
+                </Card>
+              </div>
             </div>
           )}
         </div>
       </div>
+
+      {/* FULL-WIDTH MAIN TREATMENT & NACL AGROCHEMICAL RECOMMENDATIONS SECTION */}
+      {analysisResult && (
+        <div className="space-y-5 pt-4 border-t border-industrial-200 animate-in fade-in">
+          {/* Section Header */}
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center space-x-3">
+              <div className="p-2.5 rounded-2xl bg-[#fdeade] text-[#b85119] border border-[#f5d5c0]">
+                <FlaskConical className="w-5.5 h-5.5" />
+              </div>
+              <div>
+                <h3 className="text-xl font-extrabold text-industrial-900 tracking-tight">
+                  NACL Agrochemical Treatment Advisory &amp; Model Feedback
+                </h3>
+                <p className="text-xs text-industrial-500 font-mono">
+                  RAG Database Match • Active Ingredient Chemistry • Gemini AI Advisory
+                </p>
+              </div>
+            </div>
+            {naclRecs && (
+              <span className="px-4 py-1.5 rounded-full bg-[#fdeade] text-[#b85119] text-xs font-mono font-extrabold border border-[#f5d5c0]">
+                {naclRecs.recommendations.length} Recommended Agrochemical Products
+              </span>
+            )}
+          </div>
+
+          {/* Side-by-Side Gemini AI Agronomist Advisory & Model Feedback Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            {/* Gemini AI Agronomist Advisory Card (7 cols) */}
+            {naclRecs && (
+              <Card
+                className={`lg:col-span-7 p-5 rounded-2xl shadow-sm space-y-3.5 border flex flex-col justify-between ${analysisResult?.diagnosis?.crop_compatibility_status === 'MISMATCHED_HOST' || naclRecs.safety_disclaimer?.includes('CAUTION')
+                  ? 'bg-amber-50/60 border-amber-200'
+                  : 'bg-white border-industrial-200'
+                  }`}
+              >
+                <div className="space-y-3.5">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center space-x-2.5">
+                      <div
+                        className={`p-2 rounded-xl border ${analysisResult?.diagnosis?.crop_compatibility_status === 'MISMATCHED_HOST' || naclRecs.safety_disclaimer?.includes('CAUTION')
+                          ? 'bg-amber-100 text-amber-800 border-amber-300'
+                          : 'bg-[#fdeade] text-[#d96b27] border-[#f5d5c0]'
+                          }`}
+                      >
+                        {analysisResult?.diagnosis?.crop_compatibility_status === 'MISMATCHED_HOST' || naclRecs.safety_disclaimer?.includes('CAUTION') ? (
+                          <AlertCircle className="w-5 h-5 text-amber-600" />
+                        ) : (
+                          <Sparkles className="w-5 h-5" />
+                        )}
+                      </div>
+                      <div>
+                        <h4
+                          className={`text-sm font-extrabold font-mono uppercase tracking-wider ${analysisResult?.diagnosis?.crop_compatibility_status === 'MISMATCHED_HOST' || naclRecs.safety_disclaimer?.includes('CAUTION')
+                            ? 'text-amber-950'
+                            : 'text-industrial-900'
+                            }`}
+                        >
+                          {analysisResult?.diagnosis?.crop_compatibility_status === 'MISMATCHED_HOST'
+                            ? 'Host Caution & Advisory'
+                            : 'Gemini AI Agronomist Advisory'}
+                        </h4>
+                        <p className="text-[11px] text-industrial-500 font-mono">
+                          Personalized chemical action guide for {naclRecs.crop_name} protection
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    className={`p-3.5 rounded-xl text-xs leading-relaxed font-medium border ${analysisResult?.diagnosis?.crop_compatibility_status === 'MISMATCHED_HOST' || naclRecs.safety_disclaimer?.includes('CAUTION')
+                      ? 'bg-amber-100/60 border-amber-300 text-amber-900'
+                      : 'bg-industrial-50 border-industrial-100 text-industrial-800'
+                      }`}
+                  >
+                    {naclRecs.ai_advisory_summary}
+                  </div>
+                </div>
+
+                {/* Active Ingredients Chips */}
+                {naclRecs.recommended_active_ingredients.length > 0 && (
+                  <div className="flex items-center space-x-2 flex-wrap gap-2 pt-2 border-t border-industrial-100">
+                    <span className="text-xs font-mono font-extrabold text-industrial-600 uppercase">
+                      Target Chemistry:
+                    </span>
+                    {naclRecs.recommended_active_ingredients.map((ai, idx) => (
+                      <span
+                        key={idx}
+                        className="px-2.5 py-0.5 rounded-lg bg-[#fdf3ed] border border-[#f5d5c0] text-[#b85119] text-xs font-mono font-bold"
+                      >
+                        {ai}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            )}
+
+            {/* AI Agronomist Feedback Card (5 cols) */}
+            <Card className={`${naclRecs ? 'lg:col-span-5' : 'lg:col-span-12'} p-5 bg-white border-industrial-200 space-y-4 shadow-sm flex flex-col justify-between`}>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between border-b border-industrial-100 pb-2.5">
+                  <div className="flex items-center space-x-2">
+                    <MessageSquare className="w-4.5 h-4.5 text-[#d96b27]" />
+                    <h3 className="text-xs font-extrabold text-industrial-900 uppercase font-mono tracking-wider">
+                      AI Agronomist Feedback
+                    </h3>
+                  </div>
+                  <span className="px-2 py-0.5 rounded bg-[#fdeade] text-[#b85119] text-[10px] font-mono font-bold uppercase">
+                    Model Tuning
+                  </span>
+                </div>
+
+                <p className="text-xs text-industrial-600 font-medium leading-relaxed">
+                  Provide feedback on this diagnosis to help tune Gemini AI pathology algorithms and improve crop recognition.
+                </p>
+
+                {feedbackSubmitted ? (
+                  <div className="p-4 rounded-xl bg-[#fdf3ed] border border-[#f5d5c0] text-center space-y-2">
+                    <CheckCircle2 className="w-6 h-6 text-[#d96b27] mx-auto" />
+                    <p className="text-xs font-bold text-[#8f390e]">Feedback Submitted!</p>
+                    <p className="text-[11px] text-[#b85119] font-mono">
+                      Logged into dataset tuning pipeline for Gemini plant vision models.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFeedbackSubmitted(false);
+                        setFeedbackRating(null);
+                        setFeedbackComments('');
+                      }}
+                      className="text-[11px] font-bold text-[#b85119] underline hover:text-[#8f390e] pt-1"
+                    >
+                      Submit Additional Feedback
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {/* Thumbs Up / Down */}
+                    <div className="flex items-center justify-center space-x-3">
+                      <button
+                        type="button"
+                        onClick={() => setFeedbackRating('UP')}
+                        className={`flex-1 py-2 px-3 rounded-xl border flex items-center justify-center space-x-2 text-xs font-mono font-bold transition-all ${feedbackRating === 'UP'
+                          ? 'bg-[#d96b27] text-white border-[#b85119] shadow-sm'
+                          : 'bg-industrial-50 border-industrial-200 text-industrial-700 hover:bg-[#fdf3ed] hover:border-[#f5d5c0]'
+                          }`}
+                      >
+                        <ThumbsUp className="w-4 h-4" />
+                        <span>Accurate AI</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFeedbackRating('DOWN')}
+                        className={`flex-1 py-2 px-3 rounded-xl border flex items-center justify-center space-x-2 text-xs font-mono font-bold transition-all ${feedbackRating === 'DOWN'
+                          ? 'bg-reject-600 text-white border-reject-700 shadow-sm'
+                          : 'bg-industrial-50 border-industrial-200 text-industrial-700 hover:bg-reject-50 hover:border-reject-300'
+                          }`}
+                      >
+                        <ThumbsDown className="w-4 h-4" />
+                        <span>Needs Tuning</span>
+                      </button>
+                    </div>
+
+                    {/* Category Select */}
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-mono font-extrabold text-industrial-600 uppercase">
+                        Feedback Category
+                      </label>
+                      <select
+                        value={feedbackCategory}
+                        onChange={(e) => setFeedbackCategory(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-industrial-300 text-xs font-medium text-industrial-900 bg-white focus:ring-2 focus:ring-[#d96b27] focus:outline-none"
+                      >
+                        <option value="DIAGNOSIS_CORRECT">Diagnosis &amp; Crop Correct</option>
+                        <option value="INCORRECT_CROP">Incorrect Plant Species Identified</option>
+                        <option value="INCORRECT_PATHOLOGY">Incorrect Pathology / Disease</option>
+                        <option value="TREATMENT_HELPFUL">NACL Recommendations Helpful</option>
+                        <option value="OTHER">General Feedback / Edge Case</option>
+                      </select>
+                    </div>
+
+                    {/* Comments */}
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-mono font-extrabold text-industrial-600 uppercase">
+                        Agronomist Notes / Actual Crop
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={feedbackComments}
+                        onChange={(e) => setFeedbackComments(e.target.value)}
+                        placeholder="E.g. Actual plant is Cucumber, symptoms match Powdery Mildew..."
+                        className="w-full px-3 py-2 rounded-xl border border-industrial-300 text-xs text-industrial-900 focus:ring-2 focus:ring-[#d96b27] focus:outline-none resize-none font-sans"
+                      />
+                    </div>
+
+                    {/* Submit Button */}
+                    <button
+                      type="button"
+                      onClick={handleSendFeedback}
+                      disabled={isSubmittingFeedback}
+                      className="w-full py-2.5 px-3 rounded-xl bg-[#d96b27] hover:bg-[#c55d1d] text-white text-xs font-extrabold flex items-center justify-center space-x-1.5 transition-all shadow-sm"
+                    >
+                      {isSubmittingFeedback ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Send className="w-3.5 h-3.5" />
+                          <span>Submit Agronomist Feedback</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </Card>
+          </div>
+
+          {/* Full-Width Multi-Column NACL Product Cards Grid */}
+          {naclRecs && naclRecs.recommendations.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {naclRecs.recommendations.map((prod, idx) => (
+                <Card
+                  key={idx}
+                  className="p-5 bg-white border border-industrial-200 hover:border-[#d96b27] transition-all shadow-sm hover:shadow-md space-y-3.5 flex flex-col justify-between"
+                >
+                  <div className="space-y-3">
+                    {/* Title & Category Row */}
+                    <div className="flex items-start justify-between gap-2 border-b border-industrial-100 pb-2.5">
+                      <div>
+                        <h4 className="text-base font-extrabold text-industrial-900">
+                          {prod.product_name}
+                        </h4>
+                        <span className="px-2 py-0.5 rounded bg-industrial-100 text-industrial-800 text-[10px] font-mono font-bold uppercase">
+                          {prod.category}
+                        </span>
+                      </div>
+
+                      <span className="px-2 py-0.5 rounded text-[9px] font-mono font-extrabold border bg-[#fdeade] text-[#b85119] border-[#f5d5c0]">
+                        NACL PRODUCT
+                      </span>
+                    </div>
+
+                    {/* Active Ingredient & FRAC Group */}
+                    {(prod.active_ingredient || prod.frac_group) && (
+                      <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-[#fdf3ed]/80 border border-[#f5d5c0]/60 text-xs font-mono text-[#b85119] font-extrabold">
+                        <span className="truncate">Active: {prod.active_ingredient || 'Formulated Agrochemical'}</span>
+                        {prod.frac_group && (
+                          <span className="px-1.5 py-0.5 rounded bg-[#fdeade] text-[#8f390e] text-[9px] shrink-0">
+                            {prod.frac_group}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Rationale */}
+                    <p className="text-xs text-industrial-700 bg-industrial-50 p-2.5 rounded-xl border border-industrial-100 leading-relaxed font-medium">
+                      {prod.match_rationale}
+                    </p>
+
+                    {/* Dosage & Pack Sizes */}
+                    <div className="space-y-1.5 text-xs font-mono">
+                      <div className="p-2.5 rounded-xl bg-industrial-50 border border-industrial-200 space-y-0.5">
+                        <div className="flex items-center justify-between text-[9px]">
+                          <span className="text-industrial-500 font-extrabold uppercase">
+                            RECOMMENDED DOSAGE
+                          </span>
+                        </div>
+                        <span className="text-industrial-900 font-bold block text-xs">
+                          {prod.recommended_dosage}
+                        </span>
+                      </div>
+
+                      {prod.pack_sizes && prod.pack_sizes.length > 0 && (
+                        <div className="space-y-0.5">
+                          <span className="text-[9px] text-industrial-500 font-extrabold block uppercase">
+                            PACK SIZES:
+                          </span>
+                          <div className="flex flex-wrap gap-1">
+                            {prod.pack_sizes.map((ps, pidx) => (
+                              <span
+                                key={pidx}
+                                className="px-1.5 py-0.2 rounded bg-industrial-100 text-industrial-800 text-[9px] font-bold"
+                              >
+                                {ps}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Direct NACL Product Link Button */}
+                  <div className="pt-2 border-t border-industrial-100">
+                    <a
+                      href={prod.product_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full inline-flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl bg-[#d96b27] hover:bg-[#c55d1d] text-white text-xs font-extrabold transition-all shadow-sm"
+                    >
+                      <span>View NACL Product Details</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {/* Safety Disclaimer */}
+          {naclRecs && (
+            <div className="p-3.5 rounded-xl bg-industrial-100 border border-industrial-200 text-xs text-industrial-600 flex items-start space-x-2.5 font-mono">
+              <ShieldCheck className="w-4 h-4 text-[#d96b27] flex-shrink-0 mt-0.5" />
+              <span>{naclRecs.safety_disclaimer}</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Full History Modal Dialog */}
       {showHistoryModal && (
