@@ -443,16 +443,13 @@ class KindwiseCropHealthProvider(DiseaseDetectionProvider):
                 error_message="No raw image bytes available for API request."
             )
 
-        # Convert raw images to base64 data URIs
+        # Convert raw images to base64 data URIs (downscaled for efficiency)
+        from services.leaf_disease.gemini_leaf_fallback import _downscale_image_bytes
         b64_images = []
         for filename, content in raw_files:
-            mime = "image/jpeg"
-            if filename.lower().endswith(".png"):
-                mime = "image/png"
-            elif filename.lower().endswith(".webp"):
-                mime = "image/webp"
-            encoded = base64.b64encode(content).decode("utf-8")
-            b64_images.append(f"data:{mime};base64,{encoded}")
+            resized = _downscale_image_bytes(content, max_dim=1024)
+            encoded = base64.b64encode(resized).decode("utf-8")
+            b64_images.append(f"data:image/jpeg;base64,{encoded}")
 
         url = f"{self.KINDWISE_BASE_URL}?details=crop,health,disease,description"
         headers = {

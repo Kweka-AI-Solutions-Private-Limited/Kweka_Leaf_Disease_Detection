@@ -122,6 +122,25 @@ def _get_gemini_client():
         return None, None
 
 
+def _downscale_image_bytes(img_bytes: bytes, max_dim: int = 1024) -> bytes:
+    """Downscales image to max dimension of max_dim px to optimize VLM latency and memory usage."""
+    try:
+        from PIL import Image
+        import io
+        img = Image.open(io.BytesIO(img_bytes))
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
+        w, h = img.size
+        if w > max_dim or h > max_dim:
+            img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=85)
+            return buf.getvalue()
+        return img_bytes
+    except Exception:
+        return img_bytes
+
+
 def gemini_identify_crop(
     raw_files: List[Tuple[str, bytes]]
 ) -> Optional[CropIdentificationResult]:
@@ -141,12 +160,8 @@ def gemini_identify_crop(
 
         contents: List[Any] = [CROP_IDENTIFY_PROMPT]
         for filename, img_bytes in raw_files[:3]:  # Max 3 images to Gemini
-            mime = "image/jpeg"
-            if filename.lower().endswith(".png"):
-                mime = "image/png"
-            elif filename.lower().endswith(".webp"):
-                mime = "image/webp"
-            part = types.Part.from_bytes(data=img_bytes, mime_type=mime)
+            resized_bytes = _downscale_image_bytes(img_bytes, max_dim=1024)
+            part = types.Part.from_bytes(data=resized_bytes, mime_type="image/jpeg")
             contents.append(part)
 
         if len(contents) < 2:
@@ -231,12 +246,8 @@ def gemini_analyze_disease(
 
         contents: List[Any] = [prompt]
         for filename, img_bytes in raw_files[:3]:
-            mime = "image/jpeg"
-            if filename.lower().endswith(".png"):
-                mime = "image/png"
-            elif filename.lower().endswith(".webp"):
-                mime = "image/webp"
-            part = types.Part.from_bytes(data=img_bytes, mime_type=mime)
+            resized_bytes = _downscale_image_bytes(img_bytes, max_dim=1024)
+            part = types.Part.from_bytes(data=resized_bytes, mime_type="image/jpeg")
             contents.append(part)
 
         if len(contents) < 2:

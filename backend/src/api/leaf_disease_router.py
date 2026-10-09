@@ -18,7 +18,7 @@ from fastapi import APIRouter, File, UploadFile, Form, HTTPException, status, De
 from pymongo.database import Database
 from db.connection import get_db
 
-from schemas.leaf_disease import LeafDiseaseAnalysisResponse
+from schemas.leaf_disease import LeafDiseaseAnalysisResponse, OverallImageValidationResult
 from services.leaf_disease.image_validator import validate_multiple_images
 from services.leaf_disease.plant_identifier import identify_crop
 from services.leaf_disease.disease_provider import get_disease_provider
@@ -121,157 +121,180 @@ async def analyze_leaf_disease(
         filename = upload_file.filename or "uploaded_leaf.jpg"
         file_tuples.append((filename, content))
 
-    # 1. Image Validation
-    validation_res = validate_multiple_images(file_tuples)
+    try:
+        # 1. Image Validation
+        validation_res = validate_multiple_images(file_tuples)
 
-    analysis_id = f"LDA-{uuid.uuid4().hex[:8].upper()}"
-    timestamp_str = datetime.now().isoformat()
+        analysis_id = f"LDA-{uuid.uuid4().hex[:8].upper()}"
+        timestamp_str = datetime.now().isoformat()
 
-    # Handle scenario where ALL images are invalid
-    if not validation_res.is_any_valid:
+        # Handle scenario where ALL images are invalid
+        if not validation_res.is_any_valid:
+            resp = LeafDiseaseAnalysisResponse(
+                analysis_id=analysis_id,
+                timestamp=timestamp_str,
+                status="FAILED",
+                validation=validation_res,
+                crop=identify_crop(selected_crop=selected_crop),
+                disease=None,
+                diagnosis=None,
+                retry_guidance="All submitted images failed validation. Please upload clear, uncorrupted images (JPEG, PNG, or WEBP) with adequate lighting.",
+            )
+            # Save failed run to history collection 'ldd_inspections' with user_id
+            try:
+                doc_data = resp.model_dump()
+                doc_data["user_id"] = user_id
+                doc_data["created_at"] = datetime.now(timezone.utc)
+                doc_data["filenames"] = [f[0] for f in file_tuples]
+                db[INSPECTIONS_COLLECTION].insert_one(doc_data)
+            except Exception as e:
+                print(f"[WARN] Failed to save leaf disease run history to '{INSPECTIONS_COLLECTION}': {e}")
+
+            # Log activity to 'activity_logs' with user_id
+            log_activity(
+                db=db,
+                action="LEAF_DISEASE_ANALYSIS",
+                category="DIAGNOSIS",
+                description=f"Leaf disease analysis failed for request '{analysis_id}': All submitted images failed quality validation.",
+                status="FAILED",
+                user_id=user_id,
+                metadata={"analysis_id": analysis_id, "image_count": len(files)}
+            )
+            return resp
+
+        # Filter details for usable valid images
+        valid_details = [d for d in validation_res.details if d.is_valid]
+        valid_filenames = [d.filename for d in valid_details]
+        valid_raw_files = [(fn, fb) for fn, fb in file_tuples if any(fn == d.filename for d in valid_details)]
+
+        # 2. Crop Identification
+        crop_info = identify_crop(selected_crop=selected_crop, valid_filenames=valid_filenames)
+
+        # 2b. Gemini Fallback: crop not identified by primary method
+        if crop_info.status == "UNCERTAIN" and crop_info.crop_name == "Unknown":
+            gemini_crop = gemini_identify_crop(raw_files=valid_raw_files)
+            if gemini_crop is not None:
+                crop_info = gemini_crop
+
+        # 3. Primary Disease Detection Provider Call
+        provider = get_disease_provider()
+        disease_result = provider.detect_disease(
+            crop_name=crop_info.crop_name,
+            image_details=valid_details,
+            raw_files=file_tuples
+        )
+
+        # 4. Preliminary Diagnosis Validation & Evidence Calibration
+        diagnosis_res = validate_diagnosis_evidence(
+            validation_result=validation_res,
+            crop_info=crop_info,
+            disease_result=disease_result
+        )
+
+        # 4b. Selective Gemini Second-Opinion Verification Layer
+        if should_verify_with_gemini(disease_result, diagnosis_res):
+            gemini_disease = gemini_analyze_disease(
+                crop_name=crop_info.crop_name,
+                raw_files=valid_raw_files
+            )
+            # Reconcile primary provider vs independent Gemini second opinion
+            disease_result, diagnosis_res = reconcile_diagnoses(
+                primary_result=disease_result,
+                primary_val=diagnosis_res,
+                gemini_result=gemini_disease
+            )
+
+        # Determine overall status & retry guidance
+        if disease_result.provider_status == "PROVIDER_ERROR":
+            analysis_status = "FAILED"
+            retry_guidance = "Disease detection provider encountered an error. Please verify server configuration."
+        elif diagnosis_res.is_uncertain:
+            analysis_status = "UNCERTAIN"
+            retry_guidance = diagnosis_res.targeted_close_up_request or "Diagnosis evidence is uncertain. Please upload a clear close-up of the leaf symptom."
+        else:
+            analysis_status = "SUCCESS"
+            retry_guidance = None
+
+        # 5. Treatment Recommendation Engine
+        nacl_recs = None
+        if disease_result and disease_result.disease_name:
+            is_healthy_leaf = "healthy" in disease_result.disease_name.lower()
+            nacl_recs = recommendation_engine.recommend_products(
+                crop_name=crop_info.crop_name,
+                disease_name=disease_result.disease_name,
+                is_healthy=is_healthy_leaf,
+                crop_compatibility_status=diagnosis_res.crop_compatibility_status,
+                is_uncertain=diagnosis_res.is_uncertain,
+                calibrated_confidence=diagnosis_res.calibrated_confidence,
+                contradictory_evidence_found=diagnosis_res.contradictory_evidence_found,
+                targeted_close_up_request=diagnosis_res.targeted_close_up_request,
+                diagnosis_status=diagnosis_res.diagnosis_status
+            )
+
         resp = LeafDiseaseAnalysisResponse(
             analysis_id=analysis_id,
             timestamp=timestamp_str,
-            status="FAILED",
+            status=analysis_status,
             validation=validation_res,
-            crop=identify_crop(selected_crop=selected_crop),
-            disease=None,
-            diagnosis=None,
-            retry_guidance="All submitted images failed validation. Please upload clear, uncorrupted images (JPEG, PNG, or WEBP) with adequate lighting.",
+            crop=crop_info,
+            disease=disease_result,
+            diagnosis=diagnosis_res,
+            nacl_recommendations=nacl_recs,
+            retry_guidance=retry_guidance,
         )
-        # Save failed run to history collection 'ldd_inspections' with user_id
+
+        # Save run record to MongoDB 'ldd_inspections' collection with user_id
         try:
-            doc_data = resp.model_dump()
+            doc_data = resp.model_dump(mode="json")
             doc_data["user_id"] = user_id
             doc_data["created_at"] = datetime.now(timezone.utc)
             doc_data["filenames"] = [f[0] for f in file_tuples]
             db[INSPECTIONS_COLLECTION].insert_one(doc_data)
+            print(f"[INFO] Saved leaf disease run '{analysis_id}' for user '{user_id}' to MongoDB collection '{INSPECTIONS_COLLECTION}'.")
         except Exception as e:
-            print(f"[WARN] Failed to save leaf disease run history to '{INSPECTIONS_COLLECTION}': {e}")
+            print(f"[WARN] Failed to persist leaf disease run history to '{INSPECTIONS_COLLECTION}': {e}")
 
-        # Log activity to 'activity_logs' with user_id
+        # Log activity to 'activity_logs' collection with user_id
+        disease_name_logged = disease_result.disease_name if disease_result else "Unknown"
         log_activity(
             db=db,
             action="LEAF_DISEASE_ANALYSIS",
             category="DIAGNOSIS",
-            description=f"Leaf disease analysis failed for request '{analysis_id}': All submitted images failed quality validation.",
-            status="FAILED",
+            description=f"Executed leaf disease analysis '{analysis_id}' for crop '{crop_info.crop_name}' (Diagnosis: '{disease_name_logged}'). Status: '{analysis_status}'.",
+            status=analysis_status,
             user_id=user_id,
-            metadata={"analysis_id": analysis_id, "image_count": len(files)}
+            metadata={
+                "analysis_id": analysis_id,
+                "crop_name": crop_info.crop_name,
+                "disease_name": disease_name_logged,
+                "image_count": len(files),
+                "calibrated_confidence": diagnosis_res.calibrated_confidence if diagnosis_res else None
+            }
         )
+
         return resp
 
-    # Filter details for usable valid images
-    valid_details = [d for d in validation_res.details if d.is_valid]
-    valid_filenames = [d.filename for d in valid_details]
-    valid_raw_files = [(fn, fb) for fn, fb in file_tuples if any(fn == d.filename for d in valid_details)]
-
-    # 2. Crop Identification
-    crop_info = identify_crop(selected_crop=selected_crop, valid_filenames=valid_filenames)
-
-    # 2b. Gemini Fallback: crop not identified by primary method
-    if crop_info.status == "UNCERTAIN" and crop_info.crop_name == "Unknown":
-        gemini_crop = gemini_identify_crop(raw_files=valid_raw_files)
-        if gemini_crop is not None:
-            crop_info = gemini_crop
-
-    # 3. Primary Disease Detection Provider Call
-    provider = get_disease_provider()
-    disease_result = provider.detect_disease(
-        crop_name=crop_info.crop_name,
-        image_details=valid_details,
-        raw_files=file_tuples
-    )
-
-    # 4. Preliminary Diagnosis Validation & Evidence Calibration
-    diagnosis_res = validate_diagnosis_evidence(
-        validation_result=validation_res,
-        crop_info=crop_info,
-        disease_result=disease_result
-    )
-
-    # 4b. Selective Gemini Second-Opinion Verification Layer
-    if should_verify_with_gemini(disease_result, diagnosis_res):
-        gemini_disease = gemini_analyze_disease(
-            crop_name=crop_info.crop_name,
-            raw_files=valid_raw_files
+    except Exception as exc:
+        print(f"[ERROR] Exception during analyze_leaf_disease: {exc}")
+        analysis_id = f"LDA-{uuid.uuid4().hex[:8].upper()}"
+        timestamp_str = datetime.now().isoformat()
+        return LeafDiseaseAnalysisResponse(
+            analysis_id=analysis_id,
+            timestamp=timestamp_str,
+            status="FAILED",
+            validation=OverallImageValidationResult(
+                total_submitted=len(files) if files else 0,
+                valid_count=0,
+                invalid_count=len(files) if files else 0,
+                is_any_valid=False,
+                details=[]
+            ),
+            crop=identify_crop(selected_crop=selected_crop),
+            disease=None,
+            diagnosis=None,
+            nacl_recommendations=None,
+            retry_guidance=f"Analysis encountered an internal error: {str(exc)}. Please re-try with a clear JPEG or PNG image.",
         )
-        # Reconcile primary provider vs independent Gemini second opinion
-        disease_result, diagnosis_res = reconcile_diagnoses(
-            primary_result=disease_result,
-            primary_val=diagnosis_res,
-            gemini_result=gemini_disease
-        )
-
-    # Determine overall status & retry guidance
-    if disease_result.provider_status == "PROVIDER_ERROR":
-        analysis_status = "FAILED"
-        retry_guidance = "Disease detection provider encountered an error. Please verify server configuration."
-    elif diagnosis_res.is_uncertain:
-        analysis_status = "UNCERTAIN"
-        retry_guidance = diagnosis_res.targeted_close_up_request or "Diagnosis evidence is uncertain. Please upload a clear close-up of the leaf symptom."
-    else:
-        analysis_status = "SUCCESS"
-        retry_guidance = None
-
-    # 5. Treatment Recommendation Engine
-    nacl_recs = None
-    if disease_result and disease_result.disease_name:
-        is_healthy_leaf = "healthy" in disease_result.disease_name.lower()
-        nacl_recs = recommendation_engine.recommend_products(
-            crop_name=crop_info.crop_name,
-            disease_name=disease_result.disease_name,
-            is_healthy=is_healthy_leaf,
-            crop_compatibility_status=diagnosis_res.crop_compatibility_status,
-            is_uncertain=diagnosis_res.is_uncertain,
-            calibrated_confidence=diagnosis_res.calibrated_confidence,
-            contradictory_evidence_found=diagnosis_res.contradictory_evidence_found,
-            targeted_close_up_request=diagnosis_res.targeted_close_up_request,
-            diagnosis_status=diagnosis_res.diagnosis_status
-        )
-
-    resp = LeafDiseaseAnalysisResponse(
-        analysis_id=analysis_id,
-        timestamp=timestamp_str,
-        status=analysis_status,
-        validation=validation_res,
-        crop=crop_info,
-        disease=disease_result,
-        diagnosis=diagnosis_res,
-        nacl_recommendations=nacl_recs,
-        retry_guidance=retry_guidance,
-    )
-
-    # Save run record to MongoDB 'ldd_inspections' collection with user_id
-    try:
-        doc_data = resp.model_dump(mode="json")
-        doc_data["user_id"] = user_id
-        doc_data["created_at"] = datetime.now(timezone.utc)
-        doc_data["filenames"] = [f[0] for f in file_tuples]
-        db[INSPECTIONS_COLLECTION].insert_one(doc_data)
-        print(f"[INFO] Saved leaf disease run '{analysis_id}' for user '{user_id}' to MongoDB collection '{INSPECTIONS_COLLECTION}'.")
-    except Exception as e:
-        print(f"[WARN] Failed to persist leaf disease run history to '{INSPECTIONS_COLLECTION}': {e}")
-
-    # Log activity to 'activity_logs' collection with user_id
-    disease_name_logged = disease_result.disease_name if disease_result else "Unknown"
-    log_activity(
-        db=db,
-        action="LEAF_DISEASE_ANALYSIS",
-        category="DIAGNOSIS",
-        description=f"Executed leaf disease analysis '{analysis_id}' for crop '{crop_info.crop_name}' (Diagnosis: '{disease_name_logged}'). Status: '{analysis_status}'.",
-        status=analysis_status,
-        user_id=user_id,
-        metadata={
-            "analysis_id": analysis_id,
-            "crop_name": crop_info.crop_name,
-            "disease_name": disease_name_logged,
-            "image_count": len(files),
-            "calibrated_confidence": diagnosis_res.calibrated_confidence if diagnosis_res else None
-        }
-    )
-
-    return resp
 
 
 @router.get("/catalog")

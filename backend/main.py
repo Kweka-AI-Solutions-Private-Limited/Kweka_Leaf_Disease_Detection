@@ -38,6 +38,35 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
+# Global exception handler ensuring CORS headers are ALWAYS attached on server error (500)
+from fastapi.responses import JSONResponse
+from fastapi import Request, HTTPException
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    print(f"[ERROR] Unhandled Exception: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An unexpected server error occurred.", "error": str(exc)},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "*",
+            "Access-Control-Allow-Headers": "*",
+        }
+    )
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "*",
+            "Access-Control-Allow-Headers": "*",
+        }
+    )
+
 # Mount Leaf Disease Router
 app.include_router(leaf_router, prefix="/api")
 
