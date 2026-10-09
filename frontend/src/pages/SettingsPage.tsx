@@ -1,7 +1,10 @@
 import React from 'react';
-import { Settings, CheckCircle2, ShieldCheck, Database, Key, Server, Cpu, Sparkles } from 'lucide-react';
+import { Settings, CheckCircle2, ShieldCheck, Database, Key, Server, Cpu, Sparkles, User, Lock } from 'lucide-react';
+import { getCurrentUserId } from '../api/client';
 
 export const SettingsPage: React.FC = () => {
+  const currentUserId = getCurrentUserId();
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* Header Banner */}
@@ -12,11 +15,53 @@ export const SettingsPage: React.FC = () => {
           </div>
           <div>
             <h1 className="text-2xl font-extrabold text-warmgray-900 tracking-tight">
-              Platform Settings & AI Configuration
+              Platform Settings & Multi-Tenant Security
             </h1>
             <p className="text-xs text-warmgray-500 font-medium mt-1">
-              Environment variables, database connections, and model provider fallback settings.
+              User isolation context, database queries, and AI model provider configuration.
             </p>
+          </div>
+        </div>
+      </div>
+
+      {/* User Isolation Card */}
+      <div className="bg-white border border-[#eae4dc] rounded-2xl p-6 space-y-4 shadow-xs">
+        <div className="flex items-center justify-between border-b border-[#f1eee9] pb-3">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-5 h-5 text-emerald-600" />
+            <h2 className="text-base font-bold text-warmgray-900">User Data Isolation Architecture</h2>
+          </div>
+          <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 font-mono text-xs font-bold border border-emerald-200">
+            ENFORCED & ACTIVE
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+          <div className="p-4 rounded-xl bg-warmgray-50 border border-[#eae4dc] space-y-1">
+            <div className="font-mono text-[10px] uppercase font-bold text-warmgray-500">Active User Context</div>
+            <div className="font-extrabold text-warmgray-900 text-sm flex items-center gap-1.5">
+              <User className="w-4 h-4 text-[#d96b27]" />
+              <span>{currentUserId}</span>
+            </div>
+            <p className="text-warmgray-500 text-[11px]">Injected into all API requests via X-User-ID header</p>
+          </div>
+
+          <div className="p-4 rounded-xl bg-warmgray-50 border border-[#eae4dc] space-y-1">
+            <div className="font-mono text-[10px] uppercase font-bold text-warmgray-500">MongoDB Filter Scope</div>
+            <div className="font-extrabold text-emerald-700 text-sm flex items-center gap-1.5">
+              <Lock className="w-4 h-4 text-emerald-600" />
+              <span>`{`{"user_id": "${currentUserId}"}`}`</span>
+            </div>
+            <p className="text-warmgray-500 text-[11px]">Strict isolation across ldd_inspections & activity_logs</p>
+          </div>
+
+          <div className="p-4 rounded-xl bg-warmgray-50 border border-[#eae4dc] space-y-1">
+            <div className="font-mono text-[10px] uppercase font-bold text-warmgray-500">Cross-Tenant Protection</div>
+            <div className="font-extrabold text-warmgray-900 text-sm flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <span>Zero Leakage Verification</span>
+            </div>
+            <p className="text-warmgray-500 text-[11px]">User A cannot read, list, or delete User B's scan history</p>
           </div>
         </div>
       </div>

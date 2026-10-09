@@ -23,7 +23,7 @@ MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
 MIN_DIMENSION = 150
 MAX_DIMENSION = 8000
 ALLOWED_FORMATS = {"JPEG", "JPG", "PNG", "WEBP"}
-MIN_BLUR_VARIANCE = 25.0  # Threshold for blur detection
+MIN_BLUR_VARIANCE = 12.0  # Threshold for blur detection
 MIN_BRIGHTNESS = 15.0     # Too dark threshold
 MAX_BRIGHTNESS = 245.0    # Too bright/overexposed threshold
 

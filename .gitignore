@@ -41,6 +41,8 @@ frontend/dist/
 dist/
 build/
 .vite/
+.firebase/
+frontend/.firebase/
 *.tsbuildinfo
 
 # ==========================================

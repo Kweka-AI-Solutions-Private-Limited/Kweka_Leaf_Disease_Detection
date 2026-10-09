@@ -7,13 +7,14 @@ Orchestrates:
   3. Primary Disease Detection    (+ Gemini Vision fallback when LOW confidence)
   4. Diagnosis Validation
   5. Response Formatting
+  6. Multi-Tenant User Isolation via X-User-ID header context
 """
 
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, File, UploadFile, Form, HTTPException, status, Depends, Query
+from fastapi import APIRouter, File, UploadFile, Form, HTTPException, status, Depends, Query, Header
 from pymongo.database import Database
 from db.connection import get_db
 
@@ -36,6 +37,16 @@ INSPECTIONS_COLLECTION = "ldd_inspections"
 router = APIRouter(prefix="/leaf-disease", tags=["Leaf Disease Analysis"])
 
 
+def get_current_user_id(x_user_id: Optional[str] = Header(None, alias="X-User-ID")) -> str:
+    """
+    Extracts user_id context from the 'X-User-ID' HTTP request header.
+    Defaults to 'default_user' if header is missing or empty.
+    """
+    if x_user_id and x_user_id.strip():
+        return x_user_id.strip()
+    return "default_user"
+
+
 @router.get("/plants/search")
 def search_plant_species(
     q: str = Query("", min_length=1, description="Plant name search query"),
@@ -51,12 +62,6 @@ def search_plant_species(
     return {"query": q, "results": results, "count": len(results)}
 
 
-
-# ------------------------------------------------------------------
-# Gemini fallback thresholds
-# UNCERTAIN crop:  status is UNCERTAIN and crop_name is "Unknown"
-# LOW disease:     provider confidence below this threshold
-# ------------------------------------------------------------------
 GEMINI_DISEASE_CONFIDENCE_THRESHOLD = 0.15
 
 
@@ -88,13 +93,14 @@ def _serialize_leaf_run(doc: dict) -> dict:
 async def analyze_leaf_disease(
     files: List[UploadFile] = File(...),
     selected_crop: Optional[str] = Form(None),
-    db: Database = Depends(get_db)
+    db: Database = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
 ):
     """
     Phase 1 Leaf Disease Analysis Endpoint.
     Accepts 1 to 5 leaf image files and optional crop selection override.
     Uses Gemini Vision as intelligent fallback when primary providers are uncertain.
-    Persists analysis run history to MongoDB collection 'ldd_inspections' and logs to 'activity_logs'.
+    Persists analysis run history to MongoDB collection 'ldd_inspections' and logs to 'activity_logs', isolated by user_id.
     """
     if not files or len(files) == 0:
         raise HTTPException(
@@ -133,22 +139,24 @@ async def analyze_leaf_disease(
             diagnosis=None,
             retry_guidance="All submitted images failed validation. Please upload clear, uncorrupted images (JPEG, PNG, or WEBP) with adequate lighting.",
         )
-        # Save failed run to history collection 'ldd_inspections'
+        # Save failed run to history collection 'ldd_inspections' with user_id
         try:
             doc_data = resp.model_dump()
+            doc_data["user_id"] = user_id
             doc_data["created_at"] = datetime.now(timezone.utc)
             doc_data["filenames"] = [f[0] for f in file_tuples]
             db[INSPECTIONS_COLLECTION].insert_one(doc_data)
         except Exception as e:
             print(f"[WARN] Failed to save leaf disease run history to '{INSPECTIONS_COLLECTION}': {e}")
 
-        # Log activity to 'activity_logs'
+        # Log activity to 'activity_logs' with user_id
         log_activity(
             db=db,
             action="LEAF_DISEASE_ANALYSIS",
             category="DIAGNOSIS",
             description=f"Leaf disease analysis failed for request '{analysis_id}': All submitted images failed quality validation.",
             status="FAILED",
+            user_id=user_id,
             metadata={"analysis_id": analysis_id, "image_count": len(files)}
         )
         return resp
@@ -183,7 +191,6 @@ async def analyze_leaf_disease(
     )
 
     # 4b. Selective Gemini Second-Opinion Verification Layer
-    # Triggers ONLY when primary confidence is below threshold, contradictory evidence is found, or quality is low
     if should_verify_with_gemini(disease_result, diagnosis_res):
         gemini_disease = gemini_analyze_disease(
             crop_name=crop_info.crop_name,
@@ -207,7 +214,7 @@ async def analyze_leaf_disease(
         analysis_status = "SUCCESS"
         retry_guidance = None
 
-    # 5. Treatment Recommendation Engine (Allows treatment advisory even when UNCERTAIN, with prominent warning)
+    # 5. Treatment Recommendation Engine
     nacl_recs = None
     if disease_result and disease_result.disease_name:
         is_healthy_leaf = "healthy" in disease_result.disease_name.lower()
@@ -235,17 +242,18 @@ async def analyze_leaf_disease(
         retry_guidance=retry_guidance,
     )
 
-    # Save run record to MongoDB 'ldd_inspections' collection
+    # Save run record to MongoDB 'ldd_inspections' collection with user_id
     try:
         doc_data = resp.model_dump(mode="json")
+        doc_data["user_id"] = user_id
         doc_data["created_at"] = datetime.now(timezone.utc)
         doc_data["filenames"] = [f[0] for f in file_tuples]
         db[INSPECTIONS_COLLECTION].insert_one(doc_data)
-        print(f"[INFO] Saved leaf disease run '{analysis_id}' to MongoDB collection '{INSPECTIONS_COLLECTION}'.")
+        print(f"[INFO] Saved leaf disease run '{analysis_id}' for user '{user_id}' to MongoDB collection '{INSPECTIONS_COLLECTION}'.")
     except Exception as e:
         print(f"[WARN] Failed to persist leaf disease run history to '{INSPECTIONS_COLLECTION}': {e}")
 
-    # Log activity to 'activity_logs' collection
+    # Log activity to 'activity_logs' collection with user_id
     disease_name_logged = disease_result.disease_name if disease_result else "Unknown"
     log_activity(
         db=db,
@@ -253,6 +261,7 @@ async def analyze_leaf_disease(
         category="DIAGNOSIS",
         description=f"Executed leaf disease analysis '{analysis_id}' for crop '{crop_info.crop_name}' (Diagnosis: '{disease_name_logged}'). Status: '{analysis_status}'.",
         status=analysis_status,
+        user_id=user_id,
         metadata={
             "analysis_id": analysis_id,
             "crop_name": crop_info.crop_name,
@@ -288,13 +297,31 @@ def get_nacl_catalog(db: Database = Depends(get_db)):
 
 @router.post("/feedback")
 def submit_leaf_disease_feedback(
-    payload: dict = Depends(lambda: None), # allow raw JSON body
-    db: Database = Depends(get_db)
+    payload: dict,
+    db: Database = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
 ):
     """
     Stores user feedback on AI diagnosis to improve Gemini VLM prompt tuning and dataset validation.
     """
-    pass
+    if not payload:
+        payload = {}
+    payload["user_id"] = user_id
+    payload["created_at"] = datetime.now(timezone.utc)
+    res = db["ldd_feedback"].insert_one(payload)
+    feedback_id = str(res.inserted_id)
+
+    log_activity(
+        db=db,
+        action="SUBMIT_DIAGNOSIS_FEEDBACK",
+        category="FEEDBACK",
+        description=f"Submitted diagnostic feedback for analysis '{payload.get('analysis_id', 'N/A')}'.",
+        status="SUCCESS",
+        user_id=user_id,
+        metadata={"feedback_id": feedback_id, "analysis_id": payload.get("analysis_id")}
+    )
+
+    return {"status": "success", "feedback_id": feedback_id, "message": "Feedback received successfully."}
 
 
 @router.get("/history")
@@ -302,13 +329,14 @@ def get_leaf_disease_history(
     limit: int = Query(50, ge=1, le=200),
     status: Optional[str] = Query(None),
     crop_name: Optional[str] = Query(None),
-    db: Database = Depends(get_db)
+    db: Database = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
 ):
     """
-    Returns list of historical Leaf Disease Analysis runs ordered newest first from 'ldd_inspections'.
+    Returns list of historical Leaf Disease Analysis runs for requesting user ordered newest first from 'ldd_inspections'.
     Supports filtering by status ('SUCCESS', 'UNCERTAIN', 'FAILED') and crop_name.
     """
-    query = {}
+    query = {"user_id": user_id}
     if status:
         query["status"] = status.upper()
     if crop_name:
@@ -320,22 +348,42 @@ def get_leaf_disease_history(
 
 
 @router.get("/history/{analysis_id}")
-def get_leaf_disease_run(analysis_id: str, db: Database = Depends(get_db)):
+def get_leaf_disease_run(
+    analysis_id: str,
+    db: Database = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
     """
-    Retrieves a single historical Leaf Disease Analysis run by analysis_id from 'ldd_inspections'.
+    Retrieves a single historical Leaf Disease Analysis run by analysis_id for requesting user from 'ldd_inspections'.
     """
-    doc = db[INSPECTIONS_COLLECTION].find_one({"$or": [{"analysis_id": analysis_id}, {"_id": analysis_id}]})
+    query = {
+        "$and": [
+            {"$or": [{"analysis_id": analysis_id}, {"_id": analysis_id}]},
+            {"user_id": user_id}
+        ]
+    }
+    doc = db[INSPECTIONS_COLLECTION].find_one(query)
     if not doc:
         raise HTTPException(status_code=404, detail=f"Leaf disease run with ID '{analysis_id}' not found.")
     return _serialize_leaf_run(doc)
 
 
 @router.delete("/history/{analysis_id}")
-def delete_leaf_disease_run(analysis_id: str, db: Database = Depends(get_db)):
+def delete_leaf_disease_run(
+    analysis_id: str,
+    db: Database = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
     """
-    Deletes a specific Leaf Disease Analysis run record from history collection 'ldd_inspections'.
+    Deletes a specific Leaf Disease Analysis run record from history collection 'ldd_inspections' for requesting user.
     """
-    res = db[INSPECTIONS_COLLECTION].delete_one({"$or": [{"analysis_id": analysis_id}, {"_id": analysis_id}]})
+    query = {
+        "$and": [
+            {"$or": [{"analysis_id": analysis_id}, {"_id": analysis_id}]},
+            {"user_id": user_id}
+        ]
+    }
+    res = db[INSPECTIONS_COLLECTION].delete_one(query)
     if res.deleted_count == 0:
         raise HTTPException(status_code=404, detail=f"Leaf disease run '{analysis_id}' not found.")
 
@@ -345,6 +393,7 @@ def delete_leaf_disease_run(analysis_id: str, db: Database = Depends(get_db)):
         category="HISTORY",
         description=f"Deleted leaf disease analysis run record '{analysis_id}'.",
         status="SUCCESS",
+        user_id=user_id,
         metadata={"analysis_id": analysis_id}
     )
 
@@ -352,11 +401,14 @@ def delete_leaf_disease_run(analysis_id: str, db: Database = Depends(get_db)):
 
 
 @router.delete("/history")
-def clear_leaf_disease_history(db: Database = Depends(get_db)):
+def clear_leaf_disease_history(
+    db: Database = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
     """
-    Clears all historical Leaf Disease Analysis runs from 'ldd_inspections'.
+    Clears all historical Leaf Disease Analysis runs belonging ONLY to requesting user from 'ldd_inspections'.
     """
-    res = db[INSPECTIONS_COLLECTION].delete_many({})
+    res = db[INSPECTIONS_COLLECTION].delete_many({"user_id": user_id})
 
     log_activity(
         db=db,
@@ -364,6 +416,7 @@ def clear_leaf_disease_history(db: Database = Depends(get_db)):
         category="HISTORY",
         description=f"Cleared all leaf disease analysis run history records ({res.deleted_count} records deleted).",
         status="SUCCESS",
+        user_id=user_id,
         metadata={"deleted_count": res.deleted_count}
     )
 
@@ -375,23 +428,20 @@ def get_activity_logs(
     limit: int = Query(50, ge=1, le=200),
     category: Optional[str] = Query(None),
     action: Optional[str] = Query(None),
-    user_id: Optional[str] = Query(None),
-    db: Database = Depends(get_db)
+    user_id_param: Optional[str] = Query(None, alias="user_id"),
+    db: Database = Depends(get_db),
+    current_user_id: str = Depends(get_current_user_id)
 ):
     """
-    Returns list of activity log entries from the `activity_logs` collection, ordered newest first.
-    Can be consumed by parent website to display real-time activity feeds.
+    Returns list of activity log entries for requesting user from the `activity_logs` collection, ordered newest first.
     """
-    query = {}
+    target_user_id = user_id_param if user_id_param else current_user_id
+    query = {"user_id": target_user_id}
     if category:
         query["category"] = category.upper()
     if action:
         query["action"] = action.upper()
-    if user_id:
-        query["user_id"] = user_id
 
     cursor = db[ACTIVITY_LOGS_COLLECTION].find(query).sort("created_at", -1).limit(limit)
     logs = [_serialize_leaf_run(doc) for doc in cursor]
     return logs
-
-

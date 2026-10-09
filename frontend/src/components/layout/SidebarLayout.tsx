@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -17,21 +17,69 @@ import {
   ChevronDown,
   Sparkles,
   Leaf,
-  ShieldCheck
+  ShieldCheck,
+  User,
+  UserCheck,
+  Lock,
+  Check
 } from 'lucide-react';
 import { GuidedTourModal } from '../common/GuidedTourModal';
+import { getCurrentUserId, setUserId } from '../../api/client';
 
 interface SidebarLayoutProps {
   children: React.ReactNode;
 }
+
+const PRESET_USERS = [
+  { id: 'usr_agronomist_01', name: 'Abhinav Govardhana', role: 'Lead Agronomist', avatarBg: 'bg-[#fdeade]', textColor: 'text-[#d96b27]' },
+  { id: 'usr_farmer_bob', name: 'Farmer Bob', role: 'Farm Owner (North Sector)', avatarBg: 'bg-emerald-100', textColor: 'text-emerald-800' },
+  { id: 'usr_researcher_03', name: 'Dr. Alice Chen', role: 'Pathology Researcher', avatarBg: 'bg-blue-100', textColor: 'text-blue-800' },
+];
 
 export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showTourModal, setShowTourModal] = useState(false);
+  const [activeUserId, setActiveUserId] = useState<string>(getCurrentUserId());
+  const [customInputId, setCustomInputId] = useState<string>('');
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    const handleUserChange = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail && detail.userId) {
+        setActiveUserId(detail.userId);
+      }
+    };
+    window.addEventListener('kweka_user_changed', handleUserChange);
+    return () => window.removeEventListener('kweka_user_changed', handleUserChange);
+  }, []);
+
+  const handleSwitchUser = (newId: string) => {
+    setUserId(newId);
+    setActiveUserId(newId);
+    setUserDropdownOpen(false);
+    // Reload page to reflect user-isolated data across all pages
+    window.location.reload();
+  };
+
+  const handleCustomUserSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (customInputId.trim()) {
+      handleSwitchUser(customInputId.trim());
+      setCustomInputId('');
+    }
+  };
+
+  const currentUserObj = PRESET_USERS.find((u) => u.id === activeUserId) || {
+    id: activeUserId,
+    name: `User (${activeUserId})`,
+    role: 'Custom User Context',
+    avatarBg: 'bg-purple-100',
+    textColor: 'text-purple-800',
+  };
 
   const navItems = [
     { label: 'Dashboard', path: '/', icon: LayoutDashboard },
@@ -134,24 +182,95 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
           </div>
         </div>
 
-        {/* User Profile Footer */}
+        {/* User Isolation Profile Footer & Switcher */}
         <div className="p-3 border-t border-[#e8dfd1] relative">
           <button
             type="button"
             onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-            className={`w-full flex items-center gap-3 p-2 rounded-xl hover:bg-[#eae1d3] transition-colors text-left ${collapsed ? 'justify-center' : ''}`}
+            className={`w-full flex items-center gap-3 p-2 rounded-xl hover:bg-[#eae1d3] transition-colors text-left ${
+              collapsed ? 'justify-center' : ''
+            }`}
           >
-            <div className="w-8 h-8 rounded-full bg-[#fdeade] border border-[#f5d5c0] flex items-center justify-center font-bold text-xs text-[#d96b27] shrink-0">
-              A
+            <div className={`w-8 h-8 rounded-full ${currentUserObj.avatarBg} border border-[#f5d5c0] flex items-center justify-center font-bold text-xs ${currentUserObj.textColor} shrink-0`}>
+              {currentUserObj.name.charAt(0)}
             </div>
             {!collapsed && (
               <div className="flex-1 min-w-0">
-                <div className="text-xs font-bold text-warmgray-900 truncate">Abhinav Govardhana</div>
-                <div className="text-[10px] text-warmgray-500 truncate">abhinav1ras@gmail.com</div>
+                <div className="text-xs font-bold text-warmgray-900 truncate flex items-center gap-1">
+                  <span className="truncate">{currentUserObj.name}</span>
+                  <span title="User Data Isolated"><Lock className="w-3 h-3 text-emerald-600 shrink-0" /></span>
+                </div>
+                <div className="text-[10px] text-warmgray-500 font-mono truncate">
+                  ID: {activeUserId}
+                </div>
               </div>
             )}
             {!collapsed && <ChevronDown className="w-3.5 h-3.5 text-warmgray-400 shrink-0" />}
           </button>
+
+          {/* User Switching Popover */}
+          {userDropdownOpen && (
+            <div className="absolute bottom-16 left-3 right-3 z-50 bg-white border border-[#eae4dc] rounded-2xl shadow-xl p-3 space-y-3 animate-in fade-in zoom-in-95 duration-150">
+              <div className="flex items-center justify-between border-b border-warmgray-100 pb-2">
+                <div className="text-[11px] font-extrabold uppercase font-mono text-warmgray-500 flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Switch User Identity</span>
+                </div>
+                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold border border-emerald-200">
+                  ISOLATED
+                </span>
+              </div>
+
+              <div className="space-y-1">
+                {PRESET_USERS.map((user) => {
+                  const isSelected = user.id === activeUserId;
+                  return (
+                    <button
+                      key={user.id}
+                      type="button"
+                      onClick={() => handleSwitchUser(user.id)}
+                      className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all ${
+                        isSelected
+                          ? 'bg-[#fdf3ed] text-[#d96b27] font-bold border border-[#f5d5c0]'
+                          : 'hover:bg-warmgray-50 text-warmgray-700 text-xs font-medium'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={`w-6 h-6 rounded-full ${user.avatarBg} text-xs font-bold ${user.textColor} flex items-center justify-center shrink-0`}>
+                          {user.name.charAt(0)}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs truncate font-bold">{user.name}</div>
+                          <div className="text-[10px] text-warmgray-400 font-mono truncate">{user.id}</div>
+                        </div>
+                      </div>
+                      {isSelected && <Check className="w-4 h-4 text-[#d96b27] shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Custom User ID Form */}
+              <form onSubmit={handleCustomUserSubmit} className="pt-2 border-t border-warmgray-100 space-y-1.5">
+                <div className="text-[10px] font-bold text-warmgray-500 font-mono">Custom User ID</div>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    value={customInputId}
+                    onChange={(e) => setCustomInputId(e.target.value)}
+                    placeholder="e.g. usr_test_99"
+                    className="flex-1 bg-warmgray-50 border border-warmgray-200 rounded-lg px-2.5 py-1 text-xs font-mono text-warmgray-800 focus:outline-none focus:border-[#d96b27]"
+                  />
+                  <button
+                    type="submit"
+                    className="px-2.5 py-1 rounded-lg bg-[#d96b27] text-white text-xs font-bold hover:bg-[#c55d1d] transition-colors shrink-0"
+                  >
+                    Switch
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
         </div>
       </aside>
 
@@ -176,6 +295,12 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
 
           {/* Right Header Actions */}
           <div className="flex items-center gap-3 ml-auto">
+            {/* Active User Isolation Badge */}
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-xs font-bold font-mono text-emerald-800 shadow-xs">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+              <span>User: {activeUserId}</span>
+            </div>
+
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-[#e5ded3] text-xs font-bold font-mono text-warmgray-700 shadow-xs">
               <Zap className="w-3.5 h-3.5 text-[#d96b27] fill-[#d96b27]" />
               <span>100.0 Credits</span>
@@ -221,4 +346,3 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
     </div>
   );
 };
-
