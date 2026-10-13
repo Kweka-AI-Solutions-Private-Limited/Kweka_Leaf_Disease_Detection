@@ -143,8 +143,11 @@ export function App() {
               <h2 className="text-xl font-extrabold text-warmgray-900 tracking-tight">
                 Authentication Failed
               </h2>
+              <p className="text-sm font-bold text-red-600">
+                Authentication failed. Please relogin.
+              </p>
               <p className="text-xs text-warmgray-500 font-medium">
-                We could not verify your session with the Kweka platform.
+                We could not verify your session or your exchange token has expired.
               </p>
             </div>
 
@@ -155,7 +158,7 @@ export function App() {
             </div>
 
             <p className="text-xs text-warmgray-500 leading-relaxed">
-              Exchange codes are single-use and time-limited for security. Please log in again to the Kweka Parent Platform to generate a fresh authenticated session.
+              Exchange codes are single-use and time-limited for security. Please click the button below to redirect to the login page at <span className="font-semibold text-warmgray-700">agents.kweka.ai</span>.
             </p>
 
             {/* Action Buttons */}
@@ -163,9 +166,10 @@ export function App() {
               <a
                 href={KWEKA_LOGIN_URL}
                 className="w-full py-3 px-4 rounded-xl bg-[#d96b27] hover:bg-[#c55d1d] active:scale-[0.98] text-white text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer no-underline"
+                id="redirect-to-login-btn"
               >
                 <LogIn className="w-4 h-4" />
-                <span>Log In to Kweka Platform</span>
+                <span>Redirect to Login Page</span>
                 <ExternalLink className="w-3.5 h-3.5 ml-0.5" />
               </a>
 

@@ -17,6 +17,7 @@ import {
   ShieldAlert,
   Fingerprint,
   LogOut,
+  LogIn,
   ExternalLink
 } from 'lucide-react';
 import {
@@ -253,11 +254,23 @@ export const SettingsPage: React.FC = () => {
             )}
           </div>
         ) : (
-          <div className="p-4 rounded-xl bg-warmgray-50 border border-[#eae4dc] text-xs text-warmgray-600 space-y-1">
-            <div className="font-bold text-warmgray-800">No active parent JWT session.</div>
-            <p>
-              When a user opens the prototype from the main Kweka platform with <code className="font-mono text-[#d96b27]">?exchange_code=...</code> in the URL, the app automatically exchanges it for a 7-day JWT token and logs you in.
-            </p>
+          <div className="p-4 rounded-xl bg-warmgray-50 border border-[#eae4dc] text-xs text-warmgray-600 space-y-3">
+            <div>
+              <div className="font-bold text-warmgray-800">No active parent JWT session.</div>
+              <p className="mt-0.5">
+                When a user opens the platform with <code className="font-mono text-[#d96b27]">?exchange_code=...</code> in the URL, the app automatically exchanges it for a 7-day JWT token and logs you in.
+              </p>
+            </div>
+            <div>
+              <a
+                href="https://agents.kweka.ai/login"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#d96b27] hover:bg-[#c55d1d] text-white text-xs font-bold transition-all shadow-xs no-underline"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Log In to Kweka Platform</span>
+                <ExternalLink className="w-3.5 h-3.5 ml-0.5" />
+              </a>
+            </div>
           </div>
         )}
 

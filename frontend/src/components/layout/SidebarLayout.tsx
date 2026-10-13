@@ -24,7 +24,9 @@ import {
   Check,
   Bug,
   FlaskConical,
-  Stethoscope
+  Stethoscope,
+  LogIn,
+  ExternalLink
 } from 'lucide-react';
 import { GuidedTourModal } from '../common/GuidedTourModal';
 import { getCurrentUserId, setUserId, getCurrentUserProfile, clearAuthSession, getAuthToken } from '../../api/client';
@@ -241,7 +243,7 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
                 </span>
               </div>
 
-              {userProfile && (
+              {userProfile ? (
                 <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 space-y-1">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold text-emerald-800 uppercase font-mono">Parent Account</span>
@@ -257,6 +259,18 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
                   >
                     Sign Out of JWT Session
                   </button>
+                </div>
+              ) : (
+                <div className="p-2.5 rounded-xl bg-warmgray-50 border border-[#eae4dc] space-y-1.5">
+                  <div className="text-[10px] font-bold text-warmgray-500 uppercase font-mono">Platform Authentication</div>
+                  <a
+                    href="https://agents.kweka.ai/login"
+                    className="w-full py-1.5 px-2.5 rounded-lg bg-[#d96b27] hover:bg-[#c55d1d] text-white text-[11px] font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 no-underline cursor-pointer"
+                  >
+                    <LogIn className="w-3 h-3" />
+                    <span>Log In to Kweka</span>
+                    <ExternalLink className="w-2.5 h-2.5 ml-0.5" />
+                  </a>
                 </div>
               )}
 
