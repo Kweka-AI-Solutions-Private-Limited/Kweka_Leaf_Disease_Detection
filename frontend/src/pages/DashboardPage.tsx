@@ -24,9 +24,17 @@ import {
   LeafDiseaseAnalysisResponse,
   ActivityLogEntry
 } from '../api/leafDisease';
+import { getCurrentUserId } from '../api/client';
+
+const PRESET_USER_MAP: Record<string, string> = {
+  usr_agronomist_01: 'Abhinav Govardhana (Lead Agronomist)',
+  usr_farmer_bob: 'Farmer Bob (Farm Owner)',
+  usr_researcher_03: 'Dr. Alice Chen (Pathology Researcher)',
+};
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
+  const [activeUserId, setActiveUserId] = useState<string>(getCurrentUserId());
   const [recentScans, setRecentScans] = useState<LeafDiseaseAnalysisResponse[]>([]);
   const [totalScans, setTotalScans] = useState<number>(0);
   const [catalogCount, setCatalogCount] = useState<number>(0);
@@ -36,7 +44,7 @@ export const DashboardPage: React.FC = () => {
   const loadDashboardData = async () => {
     setLoading(true);
     try {
-      // Fetch scan history from ldd_inspections
+      // Fetch scan history from ldd_inspections (filtered by X-User-ID)
       const historyData = await getLeafDiseaseHistory(200);
       setRecentScans(historyData.slice(0, 5));
       setTotalScans(historyData.length);
@@ -49,7 +57,7 @@ export const DashboardPage: React.FC = () => {
         setCatalogCount(59);
       }
 
-      // Fetch activity logs from activity_logs collection
+      // Fetch activity logs from activity_logs collection (filtered by X-User-ID)
       try {
         const logs = await getActivityLogs(10);
         setActivityLogs(logs);
@@ -66,12 +74,24 @@ export const DashboardPage: React.FC = () => {
 
   useEffect(() => {
     loadDashboardData();
+
+    const handleUserChange = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail && detail.userId) {
+        setActiveUserId(detail.userId);
+        loadDashboardData();
+      }
+    };
+    window.addEventListener('kweka_user_changed', handleUserChange);
+    return () => window.removeEventListener('kweka_user_changed', handleUserChange);
   }, []);
 
   // Calculate unique crop count from actual history
   const uniqueCropsCount = new Set(
     recentScans.map((s) => s.crop?.crop_name).filter(Boolean)
   ).size;
+
+  const currentDisplayName = PRESET_USER_MAP[activeUserId] || activeUserId;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
@@ -82,9 +102,15 @@ export const DashboardPage: React.FC = () => {
             <span>Leaf Pathology Dashboard</span>
             <span className="text-2xl">🌿</span>
           </h1>
-          <p className="text-sm font-medium text-warmgray-500 mt-1">
-            Real-time analytics across your Leaf Pathology & Agrochemical AI workspace.
-          </p>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <span className="text-sm font-medium text-warmgray-500">
+              Real-time analytics across your Leaf Pathology & Agrochemical AI workspace:
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#fdeade] text-[#d96b27] text-xs font-bold font-mono border border-[#f5d5c0]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#d96b27]"></span>
+              {currentDisplayName}
+            </span>
+          </div>
         </div>
 
         <div className="flex items-center gap-3">

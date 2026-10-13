@@ -7,11 +7,13 @@ Endpoints:
   - POST /api/leaf-advisory/generate: Generate tailored agronomist advisory with Gemini & NACL
 """
 
+from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Depends, Query, HTTPException
 from pymongo.database import Database
 
 from db.connection import get_db
+from db.activity_logger import log_activity
 from api.leaf_disease_router import get_current_user_id
 from schemas.leaf_advisory import (
     AdvisoryHistoricalDiagnosisItem,
@@ -85,17 +87,63 @@ def get_advisory_options():
 @router.post("/generate", response_model=LeafAdvisoryResponse)
 def generate_advisory(
     request: LeafAdvisoryRequest,
-    db: Database = Depends(get_db)
+    db: Database = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
 ):
     """
     Generates personalized agronomist advisory taking into account the crop,
     diagnosed condition, optional geolocation, and optional season.
+    Persists advisory report isolated by user_id and logs to activity_logs.
     """
     if not request.crop_name or not request.crop_name.strip():
         raise HTTPException(status_code=400, detail="Crop name is required to generate an advisory.")
 
     service = LeafAdvisoryService(db=db)
     try:
-        return service.generate_advisory(request)
+        result = service.generate_advisory(request)
+
+        # 1. Persist to user-isolated collection 'ldd_advisories'
+        try:
+            adv_doc = result.model_dump(mode="json")
+            adv_doc["user_id"] = user_id
+            adv_doc["created_at"] = datetime.now(timezone.utc)
+            db["ldd_advisories"].insert_one(adv_doc)
+        except Exception as e:
+            print(f"[WARN] Failed to persist advisory to ldd_advisories: {e}")
+
+        # 2. Log activity with user_id context
+        condition_label = request.disease_name or request.pest_name or "General Health"
+        log_activity(
+            db=db,
+            action="GENERATE_LEAF_ADVISORY",
+            category="ADVISORY",
+            description=f"Generated agronomist advisory for {request.crop_name} ({condition_label}).",
+            status="SUCCESS",
+            user_id=user_id,
+            metadata={
+                "advisory_id": result.advisory_id,
+                "crop_name": request.crop_name,
+                "disease_name": request.disease_name,
+                "pest_name": request.pest_name,
+                "geolocation": request.geolocation,
+                "season": request.season,
+                "nacl_products_count": len(result.nacl_products)
+            }
+        )
+
+        return result
     except Exception as ex:
+        # Log failure
+        try:
+            log_activity(
+                db=db,
+                action="GENERATE_LEAF_ADVISORY",
+                category="ADVISORY",
+                description=f"Advisory generation failed for {request.crop_name}: {str(ex)}",
+                status="FAILED",
+                user_id=user_id,
+                metadata={"crop_name": request.crop_name, "error": str(ex)}
+            )
+        except Exception:
+            pass
         raise HTTPException(status_code=500, detail=f"Failed to generate agronomist advisory: {str(ex)}")

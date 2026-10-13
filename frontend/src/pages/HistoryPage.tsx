@@ -12,30 +12,98 @@ import {
   Bug,
   FlaskConical,
   ArrowRight,
+  Trash2,
+  User,
+  Lock,
 } from 'lucide-react';
-import { getLeafDiseaseHistory, LeafDiseaseAnalysisResponse, NACLProductRecommendation } from '../api/leafDisease';
+import {
+  getLeafDiseaseHistory,
+  deleteLeafDiseaseRun,
+  clearLeafDiseaseHistory,
+  LeafDiseaseAnalysisResponse,
+  NACLProductRecommendation
+} from '../api/leafDisease';
+import { getCurrentUserId } from '../api/client';
+
+const PRESET_USER_MAP: Record<string, string> = {
+  usr_agronomist_01: 'Abhinav Govardhana (Lead Agronomist)',
+  usr_farmer_bob: 'Farmer Bob (Farm Owner)',
+  usr_researcher_03: 'Dr. Alice Chen (Pathology Researcher)',
+};
 
 export const HistoryPage: React.FC = () => {
   const navigate = useNavigate();
+  const [activeUserId, setActiveUserId] = useState<string>(getCurrentUserId());
   const [scans, setScans] = useState<LeafDiseaseAnalysisResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedScan, setSelectedScan] = useState<LeafDiseaseAnalysisResponse | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const fetchHistory = async () => {
+    setLoading(true);
+    try {
+      const data = await getLeafDiseaseHistory(50);
+      setScans(data);
+    } catch (err) {
+      console.error('Failed to load scan history:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchHistory = async () => {
-      try {
-        const data = await getLeafDiseaseHistory(50);
-        setScans(data);
-      } catch (err) {
-        console.error('Failed to load scan history:', err);
-      } finally {
-        setLoading(false);
+    fetchHistory();
+
+    const handleUserChange = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail && detail.userId) {
+        setActiveUserId(detail.userId);
+        fetchHistory();
       }
     };
-    fetchHistory();
+    window.addEventListener('kweka_user_changed', handleUserChange);
+    return () => window.removeEventListener('kweka_user_changed', handleUserChange);
   }, []);
+
+  const handleDeleteScan = async (analysisId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!window.confirm(`Are you sure you want to delete scan record "${analysisId}"?`)) return;
+    setDeletingId(analysisId);
+    try {
+      await deleteLeafDiseaseRun(analysisId);
+      setScans((prev) => prev.filter((s) => s.analysis_id !== analysisId));
+      if (selectedScan?.analysis_id === analysisId) {
+        setSelectedScan(null);
+      }
+    } catch (err) {
+      alert('Failed to delete scan record.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleClearAllHistory = async () => {
+    if (
+      !window.confirm(
+        `Are you sure you want to clear all ${scans.length} historical scans for user "${activeUserId}"? This action cannot be undone and will only purge records belonging to this user.`
+      )
+    ) {
+      return;
+    }
+    setLoading(true);
+    try {
+      await clearLeafDiseaseHistory();
+      setScans([]);
+    } catch (err) {
+      alert('Failed to clear user history.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const currentDisplayName = PRESET_USER_MAP[activeUserId] || activeUserId;
 
   const filteredScans = React.useMemo(() => {
     return scans.filter((scan) => {
@@ -64,11 +132,32 @@ export const HistoryPage: React.FC = () => {
             <h1 className="text-2xl font-extrabold text-warmgray-900 tracking-tight">
               Scan History & Audit Trail
             </h1>
-            <p className="text-xs text-warmgray-500 font-medium mt-1">
-              Historical record of leaf pathology analyses, Gemini VLM evidence calibration, and NACL recommendations.
-            </p>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <span className="text-xs text-warmgray-500 font-medium">
+                Historical record for workspace:
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#fdeade] text-[#d96b27] text-xs font-bold font-mono border border-[#f5d5c0]">
+                <User className="w-3 h-3 text-[#d96b27]" />
+                {currentDisplayName}
+              </span>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-mono font-bold border border-emerald-200">
+                <Lock className="w-3 h-3 text-emerald-600" />
+                User-Isolated
+              </span>
+            </div>
           </div>
         </div>
+
+        {scans.length > 0 && (
+          <button
+            type="button"
+            onClick={handleClearAllHistory}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-red-200 bg-red-50 text-red-700 text-xs font-bold hover:bg-red-100 transition-colors shadow-xs"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Clear My History</span>
+          </button>
+        )}
       </div>
 
       {/* Filter Toolbar */}
@@ -358,7 +447,7 @@ export const HistoryPage: React.FC = () => {
               )}
             </div>
 
-            <div className="pt-4 border-t border-[#f1eee9] flex items-center justify-between gap-3">
+            <div className="pt-4 border-t border-[#f1eee9] flex items-center justify-between gap-3 flex-wrap">
               <button
                 type="button"
                 onClick={() => {
@@ -389,13 +478,24 @@ export const HistoryPage: React.FC = () => {
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
 
-              <button
-                type="button"
-                onClick={() => setSelectedScan(null)}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors"
-              >
-                Close
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleDeleteScan(selectedScan.analysis_id)}
+                  disabled={deletingId === selectedScan.analysis_id}
+                  className="px-3.5 py-2 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{deletingId === selectedScan.analysis_id ? 'Deleting...' : 'Delete Record'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedScan(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

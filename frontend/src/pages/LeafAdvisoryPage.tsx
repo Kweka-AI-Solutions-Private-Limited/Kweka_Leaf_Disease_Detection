@@ -82,6 +82,12 @@ export const LeafAdvisoryPage: React.FC = () => {
   useEffect(() => {
     fetchHistory();
     fetchOptions();
+
+    const handleUserChange = () => {
+      fetchHistory();
+    };
+    window.addEventListener('kweka_user_changed', handleUserChange);
+    return () => window.removeEventListener('kweka_user_changed', handleUserChange);
   }, []);
 
   useEffect(() => {

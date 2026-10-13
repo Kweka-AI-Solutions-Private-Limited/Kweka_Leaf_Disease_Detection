@@ -240,6 +240,7 @@ async def analyze_unified_test_image(
     # Persist run to MongoDB 'ldd_inspections' for History & Leaf Advisory selection
     try:
         from db.connection import get_db
+        from db.activity_logger import log_activity
         db = get_db()
         doc_data = response_obj.model_dump(mode="json")
         doc_data["source"] = "LEAF_DIAGNOSIS"
@@ -270,8 +271,31 @@ async def analyze_unified_test_image(
             except Exception:
                 pass
         db["ldd_inspections"].insert_one(doc_data)
-    except Exception:
-        pass
+
+        # Log activity to 'activity_logs' with user_id
+        primary_finding = (
+            disease_result.disease_name
+            if disease_result.status == "CONFIRMED"
+            else (pest_result.primary_pest if pest_result and pest_result.status == "CONFIRMED" else "Foliage Inspection")
+        )
+        log_activity(
+            db=db,
+            action="UNIFIED_LEAF_ANALYSIS",
+            category="DIAGNOSIS",
+            description=f"Leaf diagnosis for {crop_result.crop_name}: {primary_finding} ({doc_data['status']}).",
+            status="SUCCESS" if doc_data["status"] == "SUCCESS" else "UNCERTAIN",
+            user_id=user_id,
+            metadata={
+                "analysis_id": analysis_id,
+                "crop": crop_result.crop_name,
+                "disease": disease_result.disease_name,
+                "pest": pest_result.primary_pest if pest_result else None,
+                "status": doc_data["status"],
+            }
+        )
+    except Exception as e:
+        print(f"[WARN] Failed to persist inspection or log activity in unified_test: {e}")
 
     return response_obj
+
 
