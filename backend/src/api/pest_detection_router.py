@@ -37,11 +37,7 @@ PEST_INSPECTIONS_COLLECTION = "pest_inspections"
 router = APIRouter(prefix="/pest-detection", tags=["Insect & Pest Detection"])
 
 
-def get_current_user_id(x_user_id: Optional[str] = Header(None, alias="X-User-ID")) -> str:
-    """Extracts user_id context from 'X-User-ID' HTTP header for tenant isolation."""
-    if x_user_id and x_user_id.strip():
-        return x_user_id.strip()
-    return "default_user"
+from api.auth_router import get_current_user_id
 
 
 @router.get("/status")

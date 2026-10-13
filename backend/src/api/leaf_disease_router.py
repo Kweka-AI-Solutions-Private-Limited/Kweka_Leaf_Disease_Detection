@@ -37,14 +37,7 @@ INSPECTIONS_COLLECTION = "ldd_inspections"
 router = APIRouter(prefix="/leaf-disease", tags=["Leaf Disease Analysis"])
 
 
-def get_current_user_id(x_user_id: Optional[str] = Header(None, alias="X-User-ID")) -> str:
-    """
-    Extracts user_id context from the 'X-User-ID' HTTP request header.
-    Defaults to 'default_user' if header is missing or empty.
-    """
-    if x_user_id and x_user_id.strip():
-        return x_user_id.strip()
-    return "default_user"
+from api.auth_router import get_current_user_id
 
 
 @router.get("/plants/search")

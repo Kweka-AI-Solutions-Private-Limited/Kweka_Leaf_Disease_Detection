@@ -27,16 +27,16 @@ import {
   Stethoscope
 } from 'lucide-react';
 import { GuidedTourModal } from '../common/GuidedTourModal';
-import { getCurrentUserId, setUserId } from '../../api/client';
+import { getCurrentUserId, setUserId, getCurrentUserProfile, clearAuthSession, getAuthToken } from '../../api/client';
 
 interface SidebarLayoutProps {
   children: React.ReactNode;
 }
 
 const PRESET_USERS = [
-  { id: 'usr_agronomist_01', name: 'Abhinav Govardhana', role: 'Lead Agronomist', avatarBg: 'bg-[#fdeade]', textColor: 'text-[#d96b27]' },
-  { id: 'usr_farmer_bob', name: 'Farmer Bob', role: 'Farm Owner (North Sector)', avatarBg: 'bg-emerald-100', textColor: 'text-emerald-800' },
-  { id: 'usr_researcher_03', name: 'Dr. Alice Chen', role: 'Pathology Researcher', avatarBg: 'bg-blue-100', textColor: 'text-blue-800' },
+  { id: 'usr_agronomist_01', name: 'Abhinav Govardhana', role: 'Lead Agronomist', email: 'abhinav.govardhana@kweka.ai', avatarBg: 'bg-[#fdeade]', textColor: 'text-[#d96b27]' },
+  { id: 'usr_farmer_bob', name: 'Farmer Bob', role: 'Farm Owner (North Sector)', email: 'bob.grower@farmcorp.com', avatarBg: 'bg-emerald-100', textColor: 'text-emerald-800' },
+  { id: 'usr_researcher_03', name: 'Dr. Alice Chen', role: 'Pathology Researcher', email: 'alice.chen@agri-institute.org', avatarBg: 'bg-blue-100', textColor: 'text-blue-800' },
 ];
 
 export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
@@ -46,6 +46,7 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
   const [showTourModal, setShowTourModal] = useState(false);
   const [activeUserId, setActiveUserId] = useState<string>(getCurrentUserId());
   const [customInputId, setCustomInputId] = useState<string>('');
+  const [userProfile, setUserProfile] = useState<any | null>(getCurrentUserProfile());
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -54,6 +55,7 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
       const detail = (e as CustomEvent).detail;
       if (detail && detail.userId) {
         setActiveUserId(detail.userId);
+        setUserProfile(getCurrentUserProfile());
       }
     };
     window.addEventListener('kweka_user_changed', handleUserChange);
@@ -68,6 +70,12 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
     window.location.reload();
   };
 
+  const handleLogoutSession = () => {
+    clearAuthSession();
+    setUserDropdownOpen(false);
+    window.location.reload();
+  };
+
   const handleCustomUserSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (customInputId.trim()) {
@@ -76,13 +84,25 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
     }
   };
 
-  const currentUserObj = PRESET_USERS.find((u) => u.id === activeUserId) || {
-    id: activeUserId,
-    name: `User (${activeUserId})`,
-    role: 'Custom User Context',
-    avatarBg: 'bg-purple-100',
-    textColor: 'text-purple-800',
-  };
+  const currentUserObj = userProfile
+    ? {
+        id: userProfile.id || activeUserId,
+        name: userProfile.name || `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim() || userProfile.email || 'Platform User',
+        role: userProfile.company ? `${userProfile.job_title || 'User'} (${userProfile.company})` : (userProfile.role || 'Kweka Platform User'),
+        email: userProfile.email,
+        avatarBg: 'bg-[#fdeade]',
+        textColor: 'text-[#d96b27]',
+        isJwtAuth: true,
+      }
+    : PRESET_USERS.find((u) => u.id === activeUserId) || {
+        id: activeUserId,
+        name: `User (${activeUserId})`,
+        role: 'Custom User Context',
+        email: null,
+        avatarBg: 'bg-purple-100',
+        textColor: 'text-purple-800',
+        isJwtAuth: false,
+      };
 
   const navItems = [
     { label: 'Dashboard', path: '/', icon: LayoutDashboard },
@@ -214,12 +234,31 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
               <div className="flex items-center justify-between border-b border-warmgray-100 pb-2">
                 <div className="text-[11px] font-extrabold uppercase font-mono text-warmgray-500 flex items-center gap-1.5">
                   <ShieldCheck className="w-3.5 h-3.5 text-[#d96b27]" />
-                  <span>Switch User Identity</span>
+                  <span>{userProfile ? 'Verified User Identity' : 'Switch User Identity'}</span>
                 </div>
                 <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#fdeade] text-[#d96b27] font-bold border border-[#f5d5c0]">
-                  ISOLATED
+                  {userProfile ? 'JWT VERIFIED' : 'ISOLATED'}
                 </span>
               </div>
+
+              {userProfile && (
+                <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-emerald-800 uppercase font-mono">Parent Account</span>
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  </div>
+                  <div className="text-xs font-bold text-emerald-950 truncate">{currentUserObj.name}</div>
+                  {currentUserObj.email && <div className="text-[11px] text-emerald-700 truncate">{currentUserObj.email}</div>}
+                  <div className="text-[10px] text-emerald-600 font-mono truncate">{currentUserObj.role}</div>
+                  <button
+                    type="button"
+                    onClick={handleLogoutSession}
+                    className="mt-1 text-[11px] font-bold text-red-600 hover:text-red-700 underline block cursor-pointer"
+                  >
+                    Sign Out of JWT Session
+                  </button>
+                </div>
+              )}
 
               <div className="space-y-1">
                 {PRESET_USERS.map((user) => {

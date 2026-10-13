@@ -28,6 +28,7 @@ from api.leaf_disease_router import router as leaf_router
 from api.pest_detection_router import router as pest_router
 from api.unified_test_router import router as unified_test_router
 from api.leaf_advisory_router import router as advisory_router
+from api.auth_router import router as auth_router
 from db.nacl_product_db import seed_nacl_products
 
 app = FastAPI(
@@ -81,6 +82,7 @@ app.include_router(leaf_router, prefix="/api")
 app.include_router(pest_router, prefix="/api")
 app.include_router(unified_test_router, prefix="/api")
 app.include_router(advisory_router, prefix="/api")
+app.include_router(auth_router, prefix="/api")
 
 @app.on_event("startup")
 def on_startup():

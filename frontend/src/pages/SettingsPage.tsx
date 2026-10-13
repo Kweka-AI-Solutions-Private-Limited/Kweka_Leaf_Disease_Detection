@@ -14,10 +14,21 @@ import {
   Trash2,
   Check,
   ArrowRight,
-  ShieldAlert
+  ShieldAlert,
+  Fingerprint,
+  LogOut,
+  ExternalLink
 } from 'lucide-react';
-import { getCurrentUserId, setUserId } from '../api/client';
+import {
+  getCurrentUserId,
+  setUserId,
+  getAuthToken,
+  getCurrentUserProfile,
+  setAuthSession,
+  clearAuthSession
+} from '../api/client';
 import { getLeafDiseaseHistory, getActivityLogs, clearLeafDiseaseHistory } from '../api/leafDisease';
+import { exchangeAuthCode } from '../api/auth';
 
 const PRESET_USERS = [
   { id: 'usr_agronomist_01', name: 'Abhinav Govardhana', role: 'Lead Agronomist', email: 'abhinav.govardhana@kweka.ai' },
@@ -28,6 +39,11 @@ const PRESET_USERS = [
 export const SettingsPage: React.FC = () => {
   const [activeUserId, setActiveUserId] = useState<string>(getCurrentUserId());
   const [customUserId, setCustomUserId] = useState<string>('');
+  const [exchangeInput, setExchangeInput] = useState<string>('');
+  const [isExchanging, setIsExchanging] = useState<boolean>(false);
+  const [userProfile, setUserProfile] = useState<any | null>(getCurrentUserProfile());
+  const [authToken, setAuthToken] = useState<string | null>(getAuthToken());
+
   const [userScanCount, setUserScanCount] = useState<number>(0);
   const [userActivityCount, setUserActivityCount] = useState<number>(0);
   const [loadingStats, setLoadingStats] = useState<boolean>(true);
@@ -57,6 +73,8 @@ export const SettingsPage: React.FC = () => {
       const detail = (e as CustomEvent).detail;
       if (detail && detail.userId) {
         setActiveUserId(detail.userId);
+        setUserProfile(getCurrentUserProfile());
+        setAuthToken(getAuthToken());
         fetchUserMetrics();
       }
     };
@@ -64,12 +82,47 @@ export const SettingsPage: React.FC = () => {
     return () => window.removeEventListener('kweka_user_changed', handleUserChange);
   }, []);
 
+  const handleManualExchange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!exchangeInput.trim()) return;
+
+    setIsExchanging(true);
+    try {
+      const res = await exchangeAuthCode(exchangeInput.trim());
+      setAuthSession(res.token, res.user);
+      setActiveUserId(res.user.id);
+      setUserProfile(res.user);
+      setAuthToken(res.token);
+      setExchangeInput('');
+      setMessage({
+        text: `Successfully authenticated as ${res.user.name || res.user.email} (${res.user.company || 'Kweka'}). Issued 7-day JWT access token.`,
+        type: 'success',
+      });
+      fetchUserMetrics();
+    } catch (err: any) {
+      const detail = err.response?.data?.detail || 'Exchange token verification failed or expired.';
+      setMessage({ text: detail, type: 'error' });
+    } finally {
+      setIsExchanging(false);
+      setTimeout(() => setMessage(null), 8000);
+    }
+  };
+
   const handleSwitchUser = (newId: string) => {
     const cleanId = newId.trim();
     if (!cleanId) return;
     setUserId(cleanId);
     setActiveUserId(cleanId);
     setMessage({ text: `Switched active user context to "${cleanId}". All queries are now scoped to this user.`, type: 'success' });
+    setTimeout(() => setMessage(null), 5000);
+  };
+
+  const handleLogout = () => {
+    clearAuthSession();
+    setUserProfile(null);
+    setAuthToken(null);
+    setActiveUserId('usr_agronomist_01');
+    setMessage({ text: 'Signed out of parent JWT session. Restored default persona context.', type: 'success' });
     setTimeout(() => setMessage(null), 5000);
   };
 
@@ -90,8 +143,6 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const activePersona = PRESET_USERS.find((u) => u.id === activeUserId);
-
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* Header Banner */}
@@ -105,7 +156,7 @@ export const SettingsPage: React.FC = () => {
               Platform Settings & Multi-Tenant Security
             </h1>
             <p className="text-xs text-warmgray-500 font-medium mt-1">
-              Active user context, MongoDB multi-tenant isolation, and telemetry configuration.
+              Parent platform exchange codes, JWT authentication, and MongoDB isolation.
             </p>
           </div>
         </div>
@@ -135,12 +186,115 @@ export const SettingsPage: React.FC = () => {
         </div>
       )}
 
-      {/* ── User Isolation & Identity Card ────────────────────────────────────────── */}
+      {/* ── Parent Platform JWT & Exchange Code Authentication ─────────────────────── */}
+      <div className="bg-white border border-[#eae4dc] rounded-2xl p-6 space-y-5 shadow-xs">
+        <div className="flex items-center justify-between border-b border-[#f1eee9] pb-3 flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <Fingerprint className="w-5 h-5 text-[#d96b27]" />
+            <h2 className="text-base font-bold text-warmgray-900">Parent Platform Authentication (JWT & Exchange Code)</h2>
+          </div>
+          <span
+            className={`px-3 py-1 rounded-full text-xs font-mono font-bold border flex items-center gap-1 ${
+              authToken
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : 'bg-amber-50 text-amber-700 border-amber-200'
+            }`}
+          >
+            <Lock className="w-3.5 h-3.5" />
+            {authToken ? 'JWT AUTHORIZED (HS256)' : 'DEV / GUEST CONTEXT'}
+          </span>
+        </div>
+
+        {/* Active Profile Info */}
+        {userProfile ? (
+          <div className="p-4 rounded-xl bg-emerald-50/60 border border-emerald-200 space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span className="font-bold text-sm text-emerald-950">{userProfile.name}</span>
+                {userProfile.email && (
+                  <span className="text-xs text-emerald-800 font-mono">({userProfile.email})</span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-lg border border-red-200 bg-white text-xs font-bold text-red-700 hover:bg-red-50 transition-colors cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Log Out JWT Session</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs pt-1">
+              <div>
+                <span className="text-[10px] text-emerald-700 font-mono uppercase font-bold block">Company</span>
+                <span className="font-semibold text-emerald-950">{userProfile.company || 'Kweka'}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-emerald-700 font-mono uppercase font-bold block">Job Title</span>
+                <span className="font-semibold text-emerald-950">{userProfile.job_title || 'Agronomist'}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-emerald-700 font-mono uppercase font-bold block">Role</span>
+                <span className="font-semibold text-emerald-950">{userProfile.role || 'USER'}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-emerald-700 font-mono uppercase font-bold block">MongoDB User ID</span>
+                <span className="font-mono text-emerald-900 font-semibold truncate block">{userProfile.id}</span>
+              </div>
+            </div>
+
+            {authToken && (
+              <div className="text-[11px] font-mono text-emerald-800 pt-1 border-t border-emerald-200/60 flex items-center justify-between">
+                <span>Active Bearer Token: <strong className="font-mono text-emerald-900">{authToken.slice(0, 16)}...{authToken.slice(-12)}</strong></span>
+                <span className="text-emerald-700">Validated via backend JWT_SECRET_KEY</span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="p-4 rounded-xl bg-warmgray-50 border border-[#eae4dc] text-xs text-warmgray-600 space-y-1">
+            <div className="font-bold text-warmgray-800">No active parent JWT session.</div>
+            <p>
+              When a user opens the prototype from the main Kweka platform with <code className="font-mono text-[#d96b27]">?exchange_code=...</code> in the URL, the app automatically exchanges it for a 7-day JWT token and logs you in.
+            </p>
+          </div>
+        )}
+
+        {/* Manual Exchange Code Input Form */}
+        <form onSubmit={handleManualExchange} className="space-y-2 pt-1">
+          <label className="block text-xs font-bold text-warmgray-800">
+            Manual Exchange Code Verification (Testing & Auth Handshake):
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={exchangeInput}
+              onChange={(e) => setExchangeInput(e.target.value)}
+              placeholder="Paste exchange code (e.g. 4c210e33d70b68999b3be09d5fe823cf)..."
+              className="flex-1 bg-white border border-[#e5ded3] rounded-xl px-3.5 py-2 text-xs font-mono text-warmgray-900 focus:outline-none focus:ring-2 focus:ring-[#d96b27]/30 focus:border-[#d96b27]"
+            />
+            <button
+              type="submit"
+              disabled={isExchanging || !exchangeInput.trim()}
+              className="px-4 py-2 bg-[#d96b27] hover:bg-[#c55d1d] disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer shrink-0"
+            >
+              <Key className="w-3.5 h-3.5" />
+              <span>{isExchanging ? 'Exchanging...' : 'Verify Exchange Code'}</span>
+            </button>
+          </div>
+          <p className="text-[11px] text-warmgray-500">
+            Checks <code className="font-mono">kp_user_tokens</code> in MongoDB, marks single-use code used, retrieves user from <code className="font-mono">kp_users</code>, and issues signed JWT.
+          </p>
+        </form>
+      </div>
+
+      {/* ── Multi-Tenant Isolation Info Card ─────────────────────────────────────── */}
       <div className="bg-white border border-[#eae4dc] rounded-2xl p-6 space-y-5 shadow-xs">
         <div className="flex items-center justify-between border-b border-[#f1eee9] pb-3 flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-emerald-600" />
-            <h2 className="text-base font-bold text-warmgray-900">User Identity & Multi-Tenant Isolation</h2>
+            <h2 className="text-base font-bold text-warmgray-900">User Data Isolation Architecture</h2>
           </div>
           <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 font-mono text-xs font-bold border border-emerald-200 flex items-center gap-1">
             <Lock className="w-3.5 h-3.5 text-emerald-600" />
@@ -154,9 +308,9 @@ export const SettingsPage: React.FC = () => {
             <div className="font-mono text-[10px] uppercase font-bold text-warmgray-500">Active User Context</div>
             <div className="font-extrabold text-warmgray-900 text-sm flex items-center gap-1.5">
               <User className="w-4 h-4 text-[#d96b27]" />
-              <span>{activeUserId}</span>
+              <span className="truncate">{activeUserId}</span>
             </div>
-            <p className="text-warmgray-500 text-[11px]">Injected into all API requests via X-User-ID header</p>
+            <p className="text-warmgray-500 text-[11px]">Injected into all API requests via Authorization & X-User-ID</p>
           </div>
 
           <div className="p-4 rounded-xl bg-warmgray-50 border border-[#eae4dc] space-y-1">
@@ -181,9 +335,9 @@ export const SettingsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Switch Persona Controls */}
+        {/* Switch Persona Controls (Fallback for Testing) */}
         <div className="pt-2 space-y-3">
-          <div className="text-xs font-bold text-warmgray-800">Switch Workspace Persona:</div>
+          <div className="text-xs font-bold text-warmgray-800">Or Select Demo Persona (Testing Sandbox):</div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {PRESET_USERS.map((preset) => {
               const isSelected = activeUserId === preset.id;
@@ -269,7 +423,7 @@ export const SettingsPage: React.FC = () => {
                 <Database className="w-4 h-4 text-[#d96b27]" />
                 <div>
                   <div className="font-bold text-warmgray-900">MongoDB Database Connection</div>
-                  <div className="text-[11px] text-warmgray-500">Database: leaf_disease_db (59 NACL products)</div>
+                  <div className="text-[11px] text-warmgray-500">Database: kwprotodb (Connected via MONGODB_URI)</div>
                 </div>
               </div>
               <span className="px-2.5 py-0.5 rounded-full bg-[#fdeade] text-[#d96b27] text-[10px] font-mono font-bold border border-[#f5d5c0]">
@@ -309,11 +463,22 @@ export const SettingsPage: React.FC = () => {
         <div className="bg-white border border-[#eae4dc] rounded-2xl p-6 space-y-4 shadow-xs">
           <div className="flex items-center gap-2 border-b border-[#f1eee9] pb-3">
             <Key className="w-4 h-4 text-[#d96b27]" />
-            <h2 className="text-base font-bold text-warmgray-900">API Key Status</h2>
+            <h2 className="text-base font-bold text-warmgray-900">API Key & Secret Status</h2>
           </div>
 
           <div className="space-y-3 text-xs">
             <div className="space-y-1">
+              <label className="font-bold text-warmgray-800">JWT Secret Key (Parent Platform Auth)</label>
+              <input
+                type="password"
+                disabled
+                value="••••••••••••••••••••••••••••••••"
+                className="w-full bg-warmgray-100 border border-[#e5ded3] rounded-xl px-3 py-2 text-xs font-mono text-warmgray-600"
+              />
+              <span className="text-[10px] text-emerald-700 font-bold">✓ JWT_SECRET_KEY active in backend environment</span>
+            </div>
+
+            <div className="space-y-1 pt-1">
               <label className="font-bold text-warmgray-800">Gemini API Key</label>
               <input
                 type="password"
@@ -324,7 +489,7 @@ export const SettingsPage: React.FC = () => {
               <span className="text-[10px] text-[#d96b27] font-bold">✓ GEMINI_API_KEY set in backend environment</span>
             </div>
 
-            <div className="space-y-1 pt-2">
+            <div className="space-y-1 pt-1">
               <label className="font-bold text-warmgray-800">Pl@ntNet API Key</label>
               <input
                 type="password"
