@@ -894,7 +894,79 @@ export const LeafDiseasePage: React.FC = () => {
                     </div>
                   </div>
                 )}
+
+                {/* Image Quality Breakdown */}
+                {analysisResult.validation?.details && analysisResult.validation.details.length > 0 && (
+                  <div className="pt-2 border-t border-industrial-100 space-y-1.5">
+                    <span className="text-[10px] font-bold text-industrial-500 font-mono uppercase tracking-wider block">
+                      Submitted Image Quality Checks ({analysisResult.validation.valid_count}/{analysisResult.validation.total_submitted} valid)
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono">
+                      {analysisResult.validation.details.map((detail, idx) => (
+                        <div key={idx} className="p-2 rounded-lg bg-industrial-50/70 border border-industrial-100 space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-industrial-800 truncate max-w-[150px]">{detail.filename}</span>
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${detail.is_valid ? 'bg-pass-100 text-pass-800' : 'bg-reject-100 text-reject-800'}`}>
+                              {detail.is_valid ? 'VALID' : 'INVALID'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-[10px] text-industrial-500">
+                            <span>Res: {detail.width}x{detail.height}</span>
+                            <span>Blur: {detail.blur_score}</span>
+                            <span>Bright: {detail.brightness}</span>
+                          </div>
+                          {detail.warnings && detail.warnings.length > 0 && (
+                            <p className="text-[9.5px] text-amber-700 font-sans">{detail.warnings[0]}</p>
+                          )}
+                          {detail.errors && detail.errors.length > 0 && (
+                            <p className="text-[9.5px] text-reject-700 font-sans">{detail.errors[0]}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </Card>
+
+              {/* Uncertainty or Failure Warning Banner */}
+              {analysisResult.status === 'UNCERTAIN' && (
+                <div className="p-4 rounded-xl bg-amber-50 border border-amber-300 space-y-2">
+                  <div className="flex items-center space-x-2 text-amber-900">
+                    <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+                    <span className="font-extrabold text-sm font-mono tracking-tight">
+                      UNCERTAIN DIAGNOSIS — Validation Confidence Below Strict 70% Threshold
+                    </span>
+                  </div>
+                  {analysisResult.retry_guidance && (
+                    <p className="text-xs text-amber-800 leading-relaxed font-medium pl-7">
+                      {analysisResult.retry_guidance}
+                    </p>
+                  )}
+                  {analysisResult.diagnosis?.validation_notes && analysisResult.diagnosis.validation_notes.length > 0 && (
+                    <ul className="text-[11px] text-amber-700 font-mono list-disc pl-11 space-y-0.5">
+                      {analysisResult.diagnosis.validation_notes.map((note, idx) => (
+                        <li key={idx}>{note}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {analysisResult.status === 'FAILED' && (
+                <div className="p-4 rounded-xl bg-reject-50 border border-reject-300 space-y-2">
+                  <div className="flex items-center space-x-2 text-reject-900">
+                    <AlertCircle className="w-5 h-5 text-reject-600 shrink-0" />
+                    <span className="font-extrabold text-sm font-mono tracking-tight">
+                      ANALYSIS FAILED — Inspection Inconclusive
+                    </span>
+                  </div>
+                  {analysisResult.retry_guidance && (
+                    <p className="text-xs text-reject-800 leading-relaxed font-medium pl-7">
+                      {analysisResult.retry_guidance}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Crop & Disease Result Cards Side-by-Side */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -981,34 +1053,64 @@ export const LeafDiseasePage: React.FC = () => {
                         <Cpu className="w-4 h-4 text-[#d96b27]" />
                         <span>Diagnosed Pathology</span>
                       </span>
-                      {analysisResult.disease?.is_mock && (
+                      {analysisResult.disease?.is_mock ? (
                         <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-mono font-bold uppercase">
                           MOCK PROVIDER
                         </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded bg-[#fdeade] text-[#b85119] text-[10px] font-mono font-bold uppercase">
+                          {analysisResult.disease?.provider_name || 'LIVE PROVIDER'}
+                        </span>
                       )}
                     </div>
-                    <div className="space-y-1">
-                      <p className="text-xl font-extrabold text-industrial-900">
-                        {analysisResult.disease?.disease_name || 'No Pathology Detected'}
-                      </p>
-                      <div className="flex items-center justify-between text-xs text-industrial-500 font-mono">
-                        <span>Provider: {analysisResult.disease?.provider_name}</span>
-                        {analysisResult.disease?.confidence && (
-                          <span className="font-bold text-industrial-800">
-                            Conf: {(analysisResult.disease.confidence * 100).toFixed(0)}%
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xl font-extrabold text-industrial-900">
+                          {analysisResult.disease?.disease_name || 'No Pathology Detected'}
+                        </p>
+                        {analysisResult.disease?.disease_name?.toLowerCase().includes('healthy') && (
+                          <span className="px-2.5 py-0.5 rounded-full bg-pass-100 text-pass-800 text-xs font-bold font-mono">
+                            HEALTHY LEAF
                           </span>
                         )}
+                      </div>
+
+                      {/* Raw vs Validated Confidence Metrics */}
+                      <div className="grid grid-cols-2 gap-2 text-xs font-mono pt-1">
+                        <div className="p-2 rounded-lg bg-industrial-50 border border-industrial-100">
+                          <span className="text-industrial-400 block text-[9.5px]">RAW MODEL CONFIDENCE</span>
+                          <span className="font-extrabold text-industrial-800 text-xs">
+                            {analysisResult.disease?.confidence !== null && analysisResult.disease?.confidence !== undefined
+                              ? `${(analysisResult.disease.confidence * 100).toFixed(1)}%`
+                              : 'N/A'}
+                          </span>
+                        </div>
+                        <div className="p-2 rounded-lg bg-industrial-50 border border-industrial-100">
+                          <span className="text-industrial-400 block text-[9.5px]">VALIDATED CONFIDENCE</span>
+                          {(() => {
+                            const calConf = analysisResult.diagnosis?.calibrated_confidence;
+                            if (calConf === undefined || calConf === null) {
+                              return <span className="font-extrabold text-xs text-industrial-500">N/A</span>;
+                            }
+                            const isAbove = calConf > 0.70;
+                            return (
+                              <span className={`font-extrabold text-xs ${isAbove ? 'text-pass-700' : 'text-amber-700'}`}>
+                                {(calConf * 100).toFixed(1)}% ({isAbove ? 'Passed (>70%)' : 'Uncertain (<=70%)'})
+                              </span>
+                            );
+                          })()}
+                        </div>
                       </div>
                     </div>
                     {analysisResult.disease?.candidates && analysisResult.disease.candidates.length > 0 && (
                       <div className="space-y-1 pt-1 border-t border-industrial-100">
                         <p className="text-[10px] font-mono font-bold text-industrial-500 uppercase">
-                          Candidates:
+                          Differential Candidates:
                         </p>
                         {analysisResult.disease.candidates.map((c, i) => (
                           <div key={i} className="flex justify-between text-xs font-mono text-industrial-600">
                             <span>• {c.disease_name}</span>
-                            <span>{c.confidence ? `${(c.confidence * 100).toFixed(0)}%` : ''}</span>
+                            <span>{c.confidence ? `${(c.confidence * 100).toFixed(1)}%` : ''}</span>
                           </div>
                         ))}
                       </div>

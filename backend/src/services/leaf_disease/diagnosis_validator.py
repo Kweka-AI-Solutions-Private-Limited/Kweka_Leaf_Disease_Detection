@@ -30,6 +30,9 @@ PATHOGEN_HOST_MAP = {
     "uncinula necator": ["grape"],
     "gymnosporangium sabinae": ["pear"],
     "gymnosporangium juniperi-virginianae": ["apple"],
+    "pear rust": ["pear"],
+    "cedar apple rust": ["apple", "cedar"],
+    "grape powdery mildew": ["grape"],
 }
 
 PEST_COTTONY_KEYWORDS = ["cottony", "waxy", "scale", "mealybug", "axil", "mass", "whitefly", "aphid", "webbing", "exuviae"]
@@ -192,31 +195,30 @@ def validate_diagnosis_evidence(
     )
     disease_result.calibrated_confidence = calibrated_conf
 
-    # 6. Evidence Level & Uncertainty Gate Decision
+    # 6. Evidence Level & Uncertainty Gate Decision (SUPERVISOR STRICT RULE: > 0.70)
     if contradiction_found or crop_compatibility_status == "MISMATCHED_HOST" or image_quality_status == "POOR":
         evidence_level = "LOW"
         is_uncertain = True
         notes.append("Evidence flagged due to structural contradiction, host mismatch, or poor image quality.")
-    elif calibrated_conf >= 0.70:
+    elif calibrated_conf > 0.70:
         evidence_level = "HIGH"
         is_uncertain = False
-        notes.append(f"High evidence: calibrated confidence {calibrated_conf:.2f}.")
-    elif calibrated_conf >= 0.45:
+        notes.append(f"High evidence: validated confidence ({calibrated_conf*100:.1f}%) exceeds strict 70% threshold.")
+    elif calibrated_conf >= 0.40:
         evidence_level = "MEDIUM"
-        is_uncertain = False
-        notes.append(f"Medium evidence: calibrated confidence {calibrated_conf:.2f}.")
+        is_uncertain = True
+        notes.append(f"Uncertain diagnosis: validated confidence ({calibrated_conf*100:.1f}%) does not exceed strict 70% threshold.")
     else:
         evidence_level = "LOW"
         is_uncertain = True
-        notes.append(f"Low evidence: calibrated confidence {calibrated_conf:.2f} is below reliability threshold (0.45).")
+        notes.append(f"Low evidence: validated confidence ({calibrated_conf*100:.1f}%) is below 40% threshold. Marked UNCERTAIN.")
 
-    # Determine diagnosis_status
-    if not is_uncertain and calibrated_conf >= 0.60:
+    # Determine diagnosis_status strictly: > 0.70 required for CONFIRMED
+    if not is_uncertain and calibrated_conf > 0.70:
         diag_status = "CONFIRMED"
-    elif not is_uncertain and calibrated_conf >= 0.45:
-        diag_status = "PROBABLE"
     else:
         diag_status = "UNCERTAIN"
+        is_uncertain = True
 
     # 7. Targeted Close-Up Request Generation (ONLY if uncertain or contradiction)
     targeted_close_up_request = None
@@ -253,19 +255,15 @@ def validate_diagnosis_evidence(
 def should_verify_with_gemini(
     primary_result: NormalizedDiseaseResult,
     primary_val: DiagnosisValidationResult,
-    confidence_threshold: float = 0.60
+    confidence_threshold: float = 0.70
 ) -> bool:
     """
     Determines whether Gemini second-opinion verification is required.
-    Triggers ONLY IF:
-      - Primary calibrated confidence < 0.60
-      - OR evidence contradiction detected
-      - OR image quality is POOR
-      - OR category is UNKNOWN_UNCERTAIN
+    Triggers if calibrated confidence is <= 0.70, or evidence contradiction/poor quality.
     """
     if primary_result.confidence is None:
         return True
-    if primary_val.calibrated_confidence < confidence_threshold:
+    if primary_val.calibrated_confidence <= confidence_threshold:
         return True
     if primary_val.contradictory_evidence_found:
         return True
@@ -297,9 +295,10 @@ def reconcile_diagnoses(
 ) -> Tuple[NormalizedDiseaseResult, DiagnosisValidationResult]:
     """
     Reconciles primary provider diagnosis with independent Gemini second opinion using smart fuzzy token matching.
+    Strictly enforces supervisor's > 70% confidence threshold for accepted diagnosis.
     """
     # If Gemini verification was not triggered
-    if gemini_result is None and not primary_val.is_uncertain and primary_val.calibrated_confidence >= 0.60:
+    if gemini_result is None and not primary_val.is_uncertain and primary_val.calibrated_confidence > 0.70:
         primary_val.diagnosis_status = "CONFIRMED"
         primary_val.gemini_verification = "NOT_REQUIRED"
         primary_val.primary_diagnosis = primary_result.disease_name
@@ -307,8 +306,8 @@ def reconcile_diagnoses(
         return primary_result, primary_val
 
     if gemini_result is None or (gemini_result.confidence or 0.0) < 0.40:
-        # Gemini returned empty/low response, fallback to primary if valid
-        if primary_val.calibrated_confidence >= 0.50 and not primary_val.contradictory_evidence_found:
+        # Gemini returned empty/low response, fallback to primary if valid and > 0.70
+        if primary_val.calibrated_confidence > 0.70 and not primary_val.contradictory_evidence_found:
             primary_val.diagnosis_status = "CONFIRMED"
             primary_val.gemini_verification = "INCONCLUSIVE"
             primary_val.is_uncertain = False
@@ -335,19 +334,27 @@ def reconcile_diagnoses(
 
     if is_agreement:
         final_disease = gemini_result if (gemini_result.confidence or 0) > (primary_result.confidence or 0) else primary_result
-        primary_val.diagnosis_status = "CONFIRMED_BY_SECOND_OPINION"
-        primary_val.gemini_verification = "AGREED"
+        reconciled_conf = max(primary_val.calibrated_confidence, final_disease.confidence or 0.85, 0.85)
+        primary_val.calibrated_confidence = reconciled_conf
         primary_val.primary_diagnosis = final_disease.disease_name
         primary_val.primary_confidence = final_disease.confidence
-        primary_val.is_uncertain = False
-        primary_val.calibrated_confidence = max(primary_val.calibrated_confidence, final_disease.confidence or 0.85, 0.85)
+        primary_val.gemini_verification = "AGREED"
+
+        if reconciled_conf > 0.70:
+            primary_val.diagnosis_status = "CONFIRMED_BY_SECOND_OPINION"
+            primary_val.is_uncertain = False
+            primary_val.evidence_level = "HIGH"
+        else:
+            primary_val.diagnosis_status = "UNCERTAIN"
+            primary_val.is_uncertain = True
+
         primary_val.validation_notes.append(
             f"Diagnosis confirmed by independent AI visual verification ({final_disease.disease_name})."
         )
         return final_disease, primary_val
     else:
-        # Diagnostic Conflict — ONLY mark uncertain if primary confidence is low (<0.60)
-        if (primary_result.confidence or 0) >= 0.70:
+        # Diagnostic Conflict
+        if (primary_result.confidence or 0) > 0.70 and primary_val.calibrated_confidence > 0.70:
             primary_val.diagnosis_status = "CONFIRMED"
             primary_val.gemini_verification = "DISAGREED"
             primary_val.is_uncertain = False
@@ -358,6 +365,7 @@ def reconcile_diagnoses(
         primary_val.primary_diagnosis = primary_result.disease_name
         primary_val.primary_confidence = primary_result.confidence
         primary_val.is_uncertain = True
+        primary_val.evidence_level = "LOW"
         primary_val.validation_notes.append(
             f"Diagnostic conflict: Primary suggests '{primary_result.disease_name}', "
             f"whereas secondary analysis suggests '{gemini_result.disease_name}'."

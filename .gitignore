@@ -63,3 +63,21 @@ frontend/.firebase/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# ==========================================
+# Experimental Worktrees & Scratch Directories
+# ==========================================
+.experimental*/
+*.experimental*
+.worktree*/
+
+# ==========================================
+# Large Training Checkpoints & Datasets (>100MB)
+# ==========================================
+backend/src/unified_api/training/
+*.zip
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+

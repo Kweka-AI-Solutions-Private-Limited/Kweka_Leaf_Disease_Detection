@@ -51,6 +51,13 @@ export interface DiagnosisValidationResult {
   crop_compatibility_status: string;
   consistency_status: string;
   is_uncertain: boolean;
+  calibrated_confidence?: number;
+  contradictory_evidence_found?: boolean;
+  targeted_close_up_request?: string;
+  diagnosis_status?: string;
+  primary_diagnosis?: string;
+  primary_confidence?: number;
+  gemini_verification?: string;
   validation_notes: string[];
 }
 
@@ -86,13 +93,17 @@ export interface LeafDiseaseAnalysisResponse {
   analysis_id: string;
   timestamp: string;
   status: 'SUCCESS' | 'UNCERTAIN' | 'FAILED';
-  validation: OverallImageValidationResult;
+  validation?: OverallImageValidationResult;
   crop: CropIdentificationResult;
   disease?: NormalizedDiseaseResult;
   diagnosis?: DiagnosisValidationResult;
+  pest?: any;
+  weed?: any;
+  cross_validation?: any;
+  source?: string;
   nacl_recommendations?: ProductRecommendationResult;
   retry_guidance?: string;
-  phase_notice: string;
+  phase_notice?: string;
 }
 
 export async function analyzeLeafDisease(

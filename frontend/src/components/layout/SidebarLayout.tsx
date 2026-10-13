@@ -21,7 +21,10 @@ import {
   User,
   UserCheck,
   Lock,
-  Check
+  Check,
+  Bug,
+  FlaskConical,
+  Stethoscope
 } from 'lucide-react';
 import { GuidedTourModal } from '../common/GuidedTourModal';
 import { getCurrentUserId, setUserId } from '../../api/client';
@@ -83,7 +86,8 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
 
   const navItems = [
     { label: 'Dashboard', path: '/', icon: LayoutDashboard },
-    { label: 'Leaf Scanner', path: '/scan', icon: Sprout, badge: 'AI VLM' },
+    { label: 'Leaf Diagnosis', path: '/leaf-diagnosis', icon: FlaskConical, badge: 'Pro' },
+    { label: 'Leaf Advisory', path: '/leaf-advisory', icon: Stethoscope, badge: 'Advisor' },
     { label: 'NACL Catalog', path: '/catalog', icon: BookOpen, count: '59' },
     { label: 'Scan History', path: '/history', icon: History },
     { label: 'Analytics', path: '/analytics', icon: BarChart3 },
@@ -94,15 +98,13 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
     <div className="flex min-h-screen bg-[#f8f5f0] text-warmgray-900 font-sans selection:bg-[#fdeade] selection:text-[#d96b27]">
       {/* ─── Left Sidebar ────────────────────────────────────────────────────────── */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-40 bg-[#f4efe6] border-r border-[#e8dfd1] flex flex-col transition-all duration-300 ${
-          collapsed ? 'w-20' : 'w-64'
-        }`}
+        className={`fixed top-0 bottom-0 left-0 z-40 bg-[#f4efe6] border-r border-[#e8dfd1] flex flex-col transition-all duration-300 ${collapsed ? 'w-20' : 'w-64'
+          }`}
       >
         {/* Brand Header */}
         <div
-          className={`border-b border-[#e8dfd1]/60 flex items-center transition-all ${
-            collapsed ? 'px-2 py-4 justify-between' : 'p-5 justify-between'
-          }`}
+          className={`border-b border-[#e8dfd1]/60 flex items-center transition-all ${collapsed ? 'px-2 py-4 justify-between' : 'p-5 justify-between'
+            }`}
         >
           <NavLink to="/" className="flex items-center gap-2.5 shrink-0 min-w-0">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#d96b27] to-[#b85119] flex items-center justify-center text-white shadow-sm shrink-0">
@@ -149,11 +151,10 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
                   <NavLink
                     key={item.path}
                     to={item.path}
-                    className={`flex items-center ${collapsed ? 'justify-center px-2' : 'justify-between px-3.5'} py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                      isActive
+                    className={`flex items-center ${collapsed ? 'justify-center px-2' : 'justify-between px-3.5'} py-2.5 rounded-xl text-sm font-semibold transition-all ${isActive
                         ? 'bg-[#fdf3ed] text-[#d96b27] shadow-sm'
                         : 'text-warmgray-600 hover:bg-[#eae1d3]/60 hover:text-warmgray-900'
-                    }`}
+                      }`}
                     title={collapsed ? item.label : undefined}
                   >
                     <div className="flex items-center gap-3 min-w-0">
@@ -187,9 +188,8 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
           <button
             type="button"
             onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-            className={`w-full flex items-center gap-3 p-2 rounded-xl hover:bg-[#eae1d3] transition-colors text-left ${
-              collapsed ? 'justify-center' : ''
-            }`}
+            className={`w-full flex items-center gap-3 p-2 rounded-xl hover:bg-[#eae1d3] transition-colors text-left ${collapsed ? 'justify-center' : ''
+              }`}
           >
             <div className={`w-8 h-8 rounded-full ${currentUserObj.avatarBg} border border-[#f5d5c0] flex items-center justify-center font-bold text-xs ${currentUserObj.textColor} shrink-0`}>
               {currentUserObj.name.charAt(0)}
@@ -198,7 +198,7 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
               <div className="flex-1 min-w-0">
                 <div className="text-xs font-bold text-warmgray-900 truncate flex items-center gap-1">
                   <span className="truncate">{currentUserObj.name}</span>
-                  <span title="User Data Isolated"><Lock className="w-3 h-3 text-emerald-600 shrink-0" /></span>
+                  <span title="User Data Isolated"><Lock className="w-3 h-3 text-[#d96b27] shrink-0" /></span>
                 </div>
                 <div className="text-[10px] text-warmgray-500 font-mono truncate">
                   ID: {activeUserId}
@@ -213,10 +213,10 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
             <div className="absolute bottom-16 left-3 right-3 z-50 bg-white border border-[#eae4dc] rounded-2xl shadow-xl p-3 space-y-3 animate-in fade-in zoom-in-95 duration-150">
               <div className="flex items-center justify-between border-b border-warmgray-100 pb-2">
                 <div className="text-[11px] font-extrabold uppercase font-mono text-warmgray-500 flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#d96b27]" />
                   <span>Switch User Identity</span>
                 </div>
-                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold border border-emerald-200">
+                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#fdeade] text-[#d96b27] font-bold border border-[#f5d5c0]">
                   ISOLATED
                 </span>
               </div>
@@ -229,11 +229,10 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
                       key={user.id}
                       type="button"
                       onClick={() => handleSwitchUser(user.id)}
-                      className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all ${
-                        isSelected
+                      className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all ${isSelected
                           ? 'bg-[#fdf3ed] text-[#d96b27] font-bold border border-[#f5d5c0]'
                           : 'hover:bg-warmgray-50 text-warmgray-700 text-xs font-medium'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div className={`w-6 h-6 rounded-full ${user.avatarBg} text-xs font-bold ${user.textColor} flex items-center justify-center shrink-0`}>
@@ -296,8 +295,8 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
           {/* Right Header Actions */}
           <div className="flex items-center gap-3 ml-auto">
             {/* Active User Isolation Badge */}
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-xs font-bold font-mono text-emerald-800 shadow-xs">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#fdf3ed] border border-[#f5d5c0] text-xs font-bold font-mono text-[#d96b27] shadow-xs">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#d96b27]" />
               <span>User: {activeUserId}</span>
             </div>
 
@@ -335,8 +334,8 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
           </div>
         </header>
 
-        {/* Page Content Body */}
-        <main className="flex-1 p-6 md:p-8 max-w-7xl w-full mx-auto space-y-8">
+        {/* Page Content Body - Full Width (no empty gutters on left/right) */}
+        <main className="flex-1 p-4 md:p-6 lg:p-8 w-full space-y-8">
           {children}
         </main>
       </div>

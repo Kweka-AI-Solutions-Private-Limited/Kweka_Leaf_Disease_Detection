@@ -95,5 +95,5 @@ class LeafDiseaseAnalysisResponse(BaseModel):
     diagnosis: Optional[DiagnosisValidationResult] = None
     nacl_recommendations: Optional[ProductRecommendationResult] = None
     retry_guidance: Optional[str] = None
-    phase_notice: str = "Phase 3: Evidence-First Calibrated Leaf Disease & Pest Analysis with NACL Safety Gate."
+    phase_notice: str = "Phase 1: Evidence-First Leaf Disease Detection (Strict Confidence >70%)."
 

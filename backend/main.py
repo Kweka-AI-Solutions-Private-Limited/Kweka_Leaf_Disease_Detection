@@ -6,7 +6,13 @@ FastAPI server serving Leaf Disease Analysis, Plant Search, and NACL Recommendat
 
 import os
 import sys
+import site
 from pathlib import Path
+
+# Ensure user site packages (where PyTorch and Ultralytics are installed) are discoverable
+user_site = site.getusersitepackages()
+if user_site and Path(user_site).exists():
+    site.addsitedir(user_site)
 
 # Add src to python path for internal imports
 src_path = Path(__file__).resolve().parent / "src"
@@ -19,11 +25,14 @@ load_dotenv()
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.leaf_disease_router import router as leaf_router
+from api.pest_detection_router import router as pest_router
+from api.unified_test_router import router as unified_test_router
+from api.leaf_advisory_router import router as advisory_router
 from db.nacl_product_db import seed_nacl_products
 
 app = FastAPI(
-    title="Standalone Leaf Disease Detector API",
-    description="API for Leaf Disease Identification, Image Quality Validation & NACL Treatment Advisory",
+    title="Standalone Leaf Disease & Pest Detector API",
+    description="API for Leaf Disease Identification, Insect & Pest Detection, Image Quality Validation & NACL Treatment Advisory",
     version="1.0.0"
 )
 
@@ -67,8 +76,11 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         }
     )
 
-# Mount Leaf Disease Router
+# Mount Routers
 app.include_router(leaf_router, prefix="/api")
+app.include_router(pest_router, prefix="/api")
+app.include_router(unified_test_router, prefix="/api")
+app.include_router(advisory_router, prefix="/api")
 
 @app.on_event("startup")
 def on_startup():

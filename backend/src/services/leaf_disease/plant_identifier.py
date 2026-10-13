@@ -153,8 +153,38 @@ _ALIASES = {
     "arecanut": "Arecanut", "betelnut": "Arecanut",
     "black pepper": "Pepper",
     "cocoa": "Cocoa",
+    # Scientific names
+    "solanum tuberosum": "Potato",
+    "potato": "Potato",
+    "solanum lycopersicum": "Tomato",
+    "solanum melongena": "Brinjal / Eggplant",
+    "oryza sativa": "Rice / Paddy",
+    "zea mays": "Corn (Maize)",
+    "triticum": "Wheat",
+    "triticum aestivum": "Wheat",
+    "glycine max": "Soybean",
+    "gossypium": "Cotton",
+    "gossypium hirsutum": "Cotton",
+    "capsicum annuum": "Chilli / Pepper",
+    "brassica oleracea": "Cabbage",
+    "mangifera indica": "Mango",
+    "pyrus": "Pear",
+    "malus domestica": "Apple",
+    "arachis hypogaea": "Groundnut / Peanut",
+    "allium cepa": "Onion",
+    "allium sativum": "Garlic",
+    "daucus carota": "Carrot",
+    "coffea arabica": "Coffee",
 }
 KNOWN_CROPS.update(_ALIASES)
+
+
+def normalize_crop_name(name: str) -> str:
+    """Normalizes a raw crop or scientific name to canonical catalog display name."""
+    if not name:
+        return "Unknown"
+    cleaned = name.strip().lower()
+    return KNOWN_CROPS.get(cleaned, name.strip().title())
 
 
 def get_all_plant_species() -> List[Dict]:

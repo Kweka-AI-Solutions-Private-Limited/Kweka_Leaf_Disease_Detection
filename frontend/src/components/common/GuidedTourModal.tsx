@@ -44,7 +44,7 @@ export const GuidedTourModal: React.FC<GuidedTourModalProps> = ({ isOpen, onClos
       title: '1. Upload Leaf Images & Quality Check',
       badge: 'Step 1 of 5',
       tag: 'OpenCV Quality Preprocessing',
-      tagColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+      tagColor: 'bg-[#fdeade] text-[#d96b27] border-[#f5d5c0]',
       image: '/tour/step1_upload.png',
       description:
         'Upload 1 to 5 leaf photos (JPEG, PNG, WEBP up to 10MB each). Local OpenCV & PIL algorithms analyze image resolution, focus variance, and brightness to ensure high diagnostic accuracy.',
@@ -185,22 +185,20 @@ export const GuidedTourModal: React.FC<GuidedTourModalProps> = ({ isOpen, onClos
                 key={step.id}
                 type="button"
                 onClick={() => setActiveStep(idx)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-                  isActive
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${isActive
                     ? 'bg-[#d96b27] text-white shadow-sm scale-[1.02]'
                     : isPassed
-                    ? 'bg-[#e5ded3] text-warmgray-800 hover:bg-[#dbd3c6]'
-                    : 'bg-white/80 border border-[#e5ded3] text-warmgray-500 hover:text-warmgray-800'
-                }`}
+                      ? 'bg-[#e5ded3] text-warmgray-800 hover:bg-[#dbd3c6]'
+                      : 'bg-white/80 border border-[#e5ded3] text-warmgray-500 hover:text-warmgray-800'
+                  }`}
               >
                 <span
-                  className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-mono font-bold ${
-                    isActive
+                  className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-mono font-bold ${isActive
                       ? 'bg-white text-[#d96b27]'
                       : isPassed
-                      ? 'bg-[#d96b27] text-white'
-                      : 'bg-warmgray-200 text-warmgray-600'
-                  }`}
+                        ? 'bg-[#d96b27] text-white'
+                        : 'bg-warmgray-200 text-warmgray-600'
+                    }`}
                 >
                   {isPassed ? <Check className="w-3 h-3 stroke-[3]" /> : idx + 1}
                 </span>
@@ -260,25 +258,25 @@ export const GuidedTourModal: React.FC<GuidedTourModalProps> = ({ isOpen, onClos
               {current.interactiveType === 'qualityCheck' && (
                 <div className="space-y-2 text-xs">
                   <div className="grid grid-cols-2 gap-2">
-                    <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
-                      <div className="text-[10px] font-mono text-emerald-700 font-bold">Image Resolution</div>
-                      <div className="text-sm font-extrabold text-emerald-900 mt-0.5">4032 × 3024 px</div>
-                      <div className="text-[10px] text-emerald-600">✓ Ultra HD Optimal</div>
+                    <div className="p-2.5 rounded-xl bg-[#fdf3ed] border border-[#f5d5c0]">
+                      <div className="text-[10px] font-mono text-[#8a3b11] font-bold">Image Resolution</div>
+                      <div className="text-sm font-extrabold text-[#8a3b11] mt-0.5">4032 × 3024 px</div>
+                      <div className="text-[10px] text-[#d96b27]">✓ Ultra HD Optimal</div>
                     </div>
-                    <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
-                      <div className="text-[10px] font-mono text-emerald-700 font-bold">Focus & Clarity</div>
-                      <div className="text-sm font-extrabold text-emerald-900 mt-0.5">98.4% Score</div>
-                      <div className="text-[10px] text-emerald-600">✓ Sharp Edge Detection</div>
+                    <div className="p-2.5 rounded-xl bg-[#fdf3ed] border border-[#f5d5c0]">
+                      <div className="text-[10px] font-mono text-[#8a3b11] font-bold">Focus & Clarity</div>
+                      <div className="text-sm font-extrabold text-[#8a3b11] mt-0.5">98.4% Score</div>
+                      <div className="text-[10px] text-[#d96b27]">✓ Sharp Edge Detection</div>
                     </div>
-                    <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
-                      <div className="text-[10px] font-mono text-emerald-700 font-bold">Lighting Exposure</div>
-                      <div className="text-sm font-extrabold text-emerald-900 mt-0.5">Normal (0.82)</div>
-                      <div className="text-[10px] text-emerald-600">✓ Balanced Daylight</div>
+                    <div className="p-2.5 rounded-xl bg-[#fdf3ed] border border-[#f5d5c0]">
+                      <div className="text-[10px] font-mono text-[#8a3b11] font-bold">Lighting Exposure</div>
+                      <div className="text-sm font-extrabold text-[#8a3b11] mt-0.5">Normal (0.82)</div>
+                      <div className="text-[10px] text-[#d96b27]">✓ Balanced Daylight</div>
                     </div>
-                    <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
-                      <div className="text-[10px] font-mono text-emerald-700 font-bold">Leaf Surface Area</div>
-                      <div className="text-sm font-extrabold text-emerald-900 mt-0.5">84.2% Frame</div>
-                      <div className="text-[10px] text-emerald-600">✓ Centered Foliage</div>
+                    <div className="p-2.5 rounded-xl bg-[#fdf3ed] border border-[#f5d5c0]">
+                      <div className="text-[10px] font-mono text-[#8a3b11] font-bold">Leaf Surface Area</div>
+                      <div className="text-sm font-extrabold text-[#8a3b11] mt-0.5">84.2% Frame</div>
+                      <div className="text-[10px] text-[#d96b27]">✓ Centered Foliage</div>
                     </div>
                   </div>
                 </div>
@@ -320,7 +318,7 @@ export const GuidedTourModal: React.FC<GuidedTourModalProps> = ({ isOpen, onClos
                     className="w-full accent-[#d96b27] cursor-pointer"
                   />
                   <div className="grid grid-cols-3 gap-2 text-center">
-                    <div className={`p-2 rounded-xl border text-[11px] font-mono font-bold ${lesionSlider < 25 ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-warmgray-50 text-warmgray-400'}`}>
+                    <div className={`p-2 rounded-xl border text-[11px] font-mono font-bold ${lesionSlider < 25 ? 'bg-[#fdeade] text-[#d96b27] border-[#f5d5c0]' : 'bg-warmgray-50 text-warmgray-400'}`}>
                       Low (5-25%)
                     </div>
                     <div className={`p-2 rounded-xl border text-[11px] font-mono font-bold ${lesionSlider >= 25 && lesionSlider < 55 ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-warmgray-50 text-warmgray-400'}`}>
@@ -344,11 +342,10 @@ export const GuidedTourModal: React.FC<GuidedTourModalProps> = ({ isOpen, onClos
                           key={acres}
                           type="button"
                           onClick={() => setFieldAcres(acres)}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all ${
-                            fieldAcres === acres
+                          className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all ${fieldAcres === acres
                               ? 'bg-[#d96b27] text-white'
                               : 'bg-warmgray-100 text-warmgray-600 hover:bg-warmgray-200'
-                          }`}
+                            }`}
                         >
                           {acres} Acre{acres > 1 ? 's' : ''}
                         </button>
@@ -446,11 +443,10 @@ export const GuidedTourModal: React.FC<GuidedTourModalProps> = ({ isOpen, onClos
                 type="button"
                 onClick={handlePrev}
                 disabled={activeStep === 0}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
-                  activeStep === 0
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${activeStep === 0
                     ? 'opacity-40 cursor-not-allowed text-warmgray-400 border border-warmgray-200'
                     : 'bg-white border border-[#e5ded3] text-warmgray-800 hover:bg-warmgray-50'
-                }`}
+                  }`}
               >
                 <ChevronLeft className="w-4 h-4" />
                 <span>Previous Step</span>
@@ -473,7 +469,7 @@ export const GuidedTourModal: React.FC<GuidedTourModalProps> = ({ isOpen, onClos
                 <button
                   type="button"
                   onClick={handleStartScan}
-                  className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white px-6 py-2.5 rounded-xl text-xs font-bold shadow-md transition-all animate-pulse"
+                  className="flex items-center gap-2 bg-[#d96b27] hover:bg-[#c55d1d] active:scale-[0.98] text-white px-6 py-2.5 rounded-xl text-xs font-bold shadow-sm transition-all"
                 >
                   <Sprout className="w-4 h-4" />
                   <span>Start Leaf Scan Now</span>

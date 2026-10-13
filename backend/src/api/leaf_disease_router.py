@@ -84,8 +84,21 @@ def _serialize_leaf_run(doc: dict) -> dict:
         return val
 
     cleaned = _clean(doc)
-    if isinstance(cleaned, dict) and "_id" in cleaned and "id" not in cleaned:
-        cleaned["id"] = cleaned["_id"]
+    if isinstance(cleaned, dict):
+        if "_id" in cleaned and "id" not in cleaned:
+            cleaned["id"] = cleaned["_id"]
+        # Ensure status exists for UI display
+        if not cleaned.get("status"):
+            crop_stat = (cleaned.get("crop") or {}).get("status")
+            dis_stat = (cleaned.get("disease") or {}).get("status")
+            pest_stat = (cleaned.get("pest") or {}).get("status")
+            if crop_stat == "CONFIRMED" or dis_stat == "CONFIRMED" or pest_stat == "CONFIRMED":
+                cleaned["status"] = "SUCCESS"
+            else:
+                cleaned["status"] = "UNCERTAIN"
+        # Ensure timestamp exists
+        if not cleaned.get("timestamp"):
+            cleaned["timestamp"] = cleaned.get("created_at") or datetime.now(timezone.utc).isoformat()
     return cleaned
 
 

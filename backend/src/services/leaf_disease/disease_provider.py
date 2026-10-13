@@ -19,6 +19,7 @@ from schemas.leaf_disease import (
     DiseaseCandidate,
     ImageValidationDetail,
 )
+from services.leaf_disease.pathology_classifier import classify_disorder
 
 logger = logging.getLogger(__name__)
 
@@ -311,16 +312,52 @@ class PlantNetDiseaseProvider(DiseaseDetectionProvider):
                 score = float(top.get("score", 0.0))
                 description = top.get("description", "")
                 eppo_code = top.get("name", "")
+
+                # Check if top finding is an insect/pest organism rather than a plant pathology
+                classification = classify_disorder(description=description, eppo_code=eppo_code)
+                if not classification.is_pathology:
+                    logger.warning(
+                        "Pl@ntNet diseases API returned non-disease organism '%s' (%s). "
+                        "Excluding from pathology results.",
+                        classification.common_name,
+                        classification.scientific_name,
+                    )
+                    # Filter for any genuine secondary pathology candidates
+                    pathology_candidates = []
+                    for item in results[1:5]:
+                        c_score = float(item.get("score", 0.0))
+                        c_desc = item.get("description", "")
+                        c_code = item.get("name", "")
+                        c_class = classify_disorder(description=c_desc, eppo_code=c_code)
+                        if c_class.is_pathology:
+                            pathology_candidates.append(
+                                DiseaseCandidate(disease_name=c_class.primary_display_name, confidence=c_score)
+                            )
+
+                    return NormalizedDiseaseResult(
+                        disease_name="No Plant Disease Identified (Non-Pathology Organism Excluded)",
+                        confidence=None,
+                        provider_name="Pl@ntNet Diseases API",
+                        is_mock=False,
+                        supported=False,
+                        candidates=pathology_candidates,
+                        provider_status="OK",
+                        error_message=f"Non-pathology entity ('{classification.common_name}') excluded from disease diagnosis.",
+                    )
+
                 disease_name = self._format_disease_name(description, eppo_code)
 
-                # Build candidate list from remaining results
+                # Build candidate list from remaining results (only genuine pathologies)
                 candidates = []
                 for item in results[1:5]:
                     c_score = float(item.get("score", 0.0))
                     c_desc = item.get("description", "")
                     c_code = item.get("name", "")
-                    c_name = self._format_disease_name(c_desc, c_code)
-                    candidates.append(DiseaseCandidate(disease_name=c_name, confidence=c_score))
+                    c_class = classify_disorder(description=c_desc, eppo_code=c_code)
+                    if c_class.is_pathology:
+                        candidates.append(
+                            DiseaseCandidate(disease_name=c_class.primary_display_name, confidence=c_score)
+                        )
 
                 return NormalizedDiseaseResult(
                     disease_name=disease_name,
@@ -458,7 +495,6 @@ class KindwiseCropHealthProvider(DiseaseDetectionProvider):
         }
         payload = {
             "images": b64_images,
-            "similar_images": True
         }
 
         try:
@@ -470,10 +506,10 @@ class KindwiseCropHealthProvider(DiseaseDetectionProvider):
                 res_data = response.json()
                 res_obj = res_data.get("result", {})
                 
-                # Health & disease predictions block
-                is_healthy_obj = res_obj.get("is_healthy", {})
-                is_healthy = bool(is_healthy_obj.get("binary", False))
-                healthy_prob = float(is_healthy_obj.get("probability", 0.0))
+                # Health & disease predictions block (safely handling None)
+                is_healthy_obj = res_obj.get("is_healthy") or {}
+                is_healthy = bool(is_healthy_obj.get("binary", False)) if isinstance(is_healthy_obj, dict) else False
+                healthy_prob = float(is_healthy_obj.get("probability", 0.0)) if isinstance(is_healthy_obj, dict) else 0.0
 
                 disease_obj = res_obj.get("disease", {})
                 suggestions = disease_obj.get("suggestions", [])

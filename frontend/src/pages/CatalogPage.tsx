@@ -92,11 +92,10 @@ export const CatalogPage: React.FC = () => {
               key={cat}
               type="button"
               onClick={() => setActiveCategory(cat)}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
-                activeCategory === cat
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${activeCategory === cat
                   ? 'bg-[#d96b27] text-white shadow-xs'
                   : 'bg-white border border-[#e5ded3] text-warmgray-700 hover:bg-warmgray-50'
-              }`}
+                }`}
             >
               {cat}
             </button>

@@ -97,11 +97,11 @@ export const DashboardPage: React.FC = () => {
           </button>
           <button
             type="button"
-            onClick={() => navigate('/scan')}
+            onClick={() => navigate('/leaf-diagnosis')}
             className="flex items-center gap-2 bg-[#d96b27] hover:bg-[#c55d1d] active:scale-[0.98] text-white px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all"
           >
             <Plus className="w-4 h-4" />
-            <span>Create scan</span>
+            <span>Leaf Diagnosis</span>
           </button>
         </div>
       </div>
@@ -236,13 +236,12 @@ export const DashboardPage: React.FC = () => {
                             {scan.disease?.disease_name ? scan.disease.disease_name.split('(')[0] : 'Diagnosed'}
                           </span>
                           <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono ${
-                              scan.status === 'SUCCESS'
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono ${scan.status === 'SUCCESS'
                                 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                 : scan.status === 'UNCERTAIN'
-                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                                : 'bg-red-50 text-red-700 border border-red-200'
-                            }`}
+                                  ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                  : 'bg-red-50 text-red-700 border border-red-200'
+                              }`}
                           >
                             {scan.status}
                           </span>
@@ -363,13 +362,12 @@ export const DashboardPage: React.FC = () => {
           <div className="space-y-3">
             {activityLogs.map((log, idx) => (
               <div key={log.id || log._id || idx} className="flex items-start gap-4 text-xs hover:bg-warmgray-50 p-2.5 rounded-xl transition-colors">
-                <div className={`p-2 rounded-xl shrink-0 mt-0.5 ${
-                  log.status === 'SUCCESS' ? 'bg-emerald-50 text-emerald-700' :
-                  log.status === 'FAILED' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'
-                }`}>
+                <div className={`p-2 rounded-xl shrink-0 mt-0.5 ${log.status === 'SUCCESS' ? 'bg-emerald-50 text-emerald-700' :
+                    log.status === 'FAILED' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'
+                  }`}>
                   {log.category === 'DIAGNOSIS' ? <Sprout className="w-4 h-4" /> :
-                   log.category === 'CATALOG' ? <ShieldCheck className="w-4 h-4" /> :
-                   <Database className="w-4 h-4" />}
+                    log.category === 'CATALOG' ? <ShieldCheck className="w-4 h-4" /> :
+                      <Database className="w-4 h-4" />}
                 </div>
                 <div className="flex-1 space-y-0.5 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -377,9 +375,8 @@ export const DashboardPage: React.FC = () => {
                     <span className="px-2 py-0.5 rounded-md text-[10px] font-bold font-mono bg-warmgray-100 text-warmgray-700">
                       {log.category}
                     </span>
-                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold font-mono ${
-                      log.status === 'SUCCESS' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
-                    }`}>
+                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold font-mono ${log.status === 'SUCCESS' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                      }`}>
                       {log.status}
                     </span>
                   </div>
