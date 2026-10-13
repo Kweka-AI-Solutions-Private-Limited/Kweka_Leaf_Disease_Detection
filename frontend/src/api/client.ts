@@ -117,6 +117,19 @@ apiClient.interceptors.response.use(
       return apiClient(config);
     }
 
+    if (error.response?.status === 401 && !config.url?.includes('/api/auth/exchange')) {
+      clearAuthSession();
+      window.dispatchEvent(
+        new CustomEvent('kweka_auth_expired', {
+          detail: {
+            message:
+              error.response?.data?.detail ||
+              'Your session authorization has expired or is invalid. Please log in again to continue.',
+          },
+        })
+      );
+    }
+
     return Promise.reject(error);
   }
 );
