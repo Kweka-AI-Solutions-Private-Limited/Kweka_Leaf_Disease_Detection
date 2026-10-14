@@ -29,16 +29,32 @@ from services.weed_detection.weed_catalog import (
 logger = logging.getLogger(__name__)
 
 _cur_file = Path(__file__).resolve()
-# Check potential locations for models/weed: worktree root or backend root
-_worktree_models = _cur_file.parents[4] / "models" / "weed" if len(_cur_file.parents) >= 5 else None
-_backend_models = _cur_file.parents[3] / "models" / "weed" if len(_cur_file.parents) >= 4 else None
+# Check potential locations for models/weed: environment variable, current working dir, backend root, or repo root
+_candidates = []
+_env_dir = os.getenv("WEED_MODEL_DIR", "").strip()
+if _env_dir:
+    _candidates.append(Path(_env_dir))
 
-if _worktree_models and _worktree_models.exists():
-    DEFAULT_WEED_WEIGHTS_DIR = _worktree_models
-elif _backend_models and _backend_models.exists():
-    DEFAULT_WEED_WEIGHTS_DIR = _backend_models
-else:
-    DEFAULT_WEED_WEIGHTS_DIR = _worktree_models or Path("models/weed")
+_candidates.extend([
+    Path.cwd() / "models" / "weed",
+    Path.cwd() / "backend" / "models" / "weed",
+])
+if len(_cur_file.parents) >= 4 and _cur_file.parents[3] != Path(_cur_file.parents[3].root):
+    _candidates.append(_cur_file.parents[3] / "models" / "weed")
+if len(_cur_file.parents) >= 5 and _cur_file.parents[4] != Path(_cur_file.parents[4].root):
+    _candidates.append(_cur_file.parents[4] / "models" / "weed")
+
+DEFAULT_WEED_WEIGHTS_DIR = None
+for cand in _candidates:
+    if cand and cand.exists():
+        DEFAULT_WEED_WEIGHTS_DIR = cand
+        break
+
+if not DEFAULT_WEED_WEIGHTS_DIR:
+    if len(_cur_file.parents) >= 4 and _cur_file.parents[3] != Path(_cur_file.parents[3].root):
+        DEFAULT_WEED_WEIGHTS_DIR = _cur_file.parents[3] / "models" / "weed"
+    else:
+        DEFAULT_WEED_WEIGHTS_DIR = Path("models/weed")
 
 CANDIDATE_WEIGHT_NAMES = [
     "weed_detector.pt",

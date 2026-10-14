@@ -289,7 +289,7 @@ export const UnifiedTestingPage: React.FC = () => {
                   ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                   : 'bg-amber-100 text-amber-800 border border-amber-200'
                 }`}>
-                {statusMatrix?.detectors?.pest_detector?.status || 'OPERATIONAL'}
+                {statusMatrix?.detectors?.pest_detector?.status || 'CHECKING...'}
               </span>
             </div>
             <p className="text-[11px] text-slate-500 line-clamp-2">
@@ -311,7 +311,7 @@ export const UnifiedTestingPage: React.FC = () => {
                   ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                   : 'bg-amber-100 text-amber-800 border border-amber-200'
                 }`}>
-                {statusMatrix?.detectors?.weed_detector?.status || 'AWAITING_WEIGHTS'}
+                {statusMatrix?.detectors?.weed_detector?.status || 'CHECKING...'}
               </span>
             </div>
             <p className="text-[11px] text-slate-500 line-clamp-2">

@@ -26,16 +26,32 @@ from services.pest_detection.ip102_classes import (
 logger = logging.getLogger(__name__)
 
 _cur_file = Path(__file__).resolve()
-# Check potential locations for models/pest: worktree root or backend root
-_worktree_models = _cur_file.parents[4] / "models" / "pest" if len(_cur_file.parents) >= 5 else None
-_backend_models = _cur_file.parents[3] / "models" / "pest" if len(_cur_file.parents) >= 4 else None
+# Check potential locations for models/pest: environment variable, current working dir, backend root, or repo root
+_candidates = []
+_env_dir = os.getenv("PEST_MODEL_DIR", "").strip()
+if _env_dir:
+    _candidates.append(Path(_env_dir))
 
-if _worktree_models and _worktree_models.exists():
-    DEFAULT_WEIGHTS_DIR = _worktree_models
-elif _backend_models and _backend_models.exists():
-    DEFAULT_WEIGHTS_DIR = _backend_models
-else:
-    DEFAULT_WEIGHTS_DIR = _worktree_models or Path("models/pest")
+_candidates.extend([
+    Path.cwd() / "models" / "pest",
+    Path.cwd() / "backend" / "models" / "pest",
+])
+if len(_cur_file.parents) >= 4 and _cur_file.parents[3] != Path(_cur_file.parents[3].root):
+    _candidates.append(_cur_file.parents[3] / "models" / "pest")
+if len(_cur_file.parents) >= 5 and _cur_file.parents[4] != Path(_cur_file.parents[4].root):
+    _candidates.append(_cur_file.parents[4] / "models" / "pest")
+
+DEFAULT_WEIGHTS_DIR = None
+for cand in _candidates:
+    if cand and cand.exists():
+        DEFAULT_WEIGHTS_DIR = cand
+        break
+
+if not DEFAULT_WEIGHTS_DIR:
+    if len(_cur_file.parents) >= 4 and _cur_file.parents[3] != Path(_cur_file.parents[3].root):
+        DEFAULT_WEIGHTS_DIR = _cur_file.parents[3] / "models" / "pest"
+    else:
+        DEFAULT_WEIGHTS_DIR = Path("models/pest")
 
 DEFAULT_CHECKPOINT_NAME_PT = "ip102_detector.pt"
 DEFAULT_CHECKPOINT_NAME_ONNX = "ip102_detector.onnx"
