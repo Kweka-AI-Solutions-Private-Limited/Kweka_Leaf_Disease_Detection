@@ -255,6 +255,19 @@ async def analyze_leaf_disease(
             doc_data["user_id"] = user_id
             doc_data["created_at"] = datetime.now(timezone.utc)
             doc_data["filenames"] = [f[0] for f in file_tuples]
+            if file_tuples:
+                try:
+                    import io, base64
+                    from PIL import Image
+                    with Image.open(io.BytesIO(file_tuples[0][1])) as pil_img:
+                        pil_img = pil_img.convert("RGB")
+                        pil_img.thumbnail((720, 720))
+                        buf = io.BytesIO()
+                        pil_img.save(buf, format="JPEG", quality=80)
+                        b64_val = base64.b64encode(buf.getvalue()).decode("utf-8")
+                        doc_data["image_url"] = f"data:image/jpeg;base64,{b64_val}"
+                except Exception:
+                    pass
             db[INSPECTIONS_COLLECTION].insert_one(doc_data)
             print(f"[INFO] Saved leaf disease run '{analysis_id}' for user '{user_id}' to MongoDB collection '{INSPECTIONS_COLLECTION}'.")
         except Exception as e:

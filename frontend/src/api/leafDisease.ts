@@ -24,9 +24,13 @@ export interface OverallImageValidationResult {
 export interface CropIdentificationResult {
   crop_name: string;
   confidence?: number;
-  source: string;
-  status: 'CONFIRMED' | 'USER_SPECIFIED' | 'UNCERTAIN';
-  evidence_note: string;
+  source?: string;
+  status?: 'CONFIRMED' | 'USER_SPECIFIED' | 'UNCERTAIN' | string;
+  evidence_note?: string;
+  scientific_name?: string;
+  message?: string;
+  plant_type?: string;
+  common_names?: string[];
 }
 
 export interface DiseaseCandidate {
@@ -37,12 +41,16 @@ export interface DiseaseCandidate {
 export interface NormalizedDiseaseResult {
   disease_name: string;
   confidence?: number;
-  provider_name: string;
-  is_mock: boolean;
-  supported: boolean;
-  candidates: DiseaseCandidate[];
-  provider_status: 'OK' | 'UNSUPPORTED_CROP' | 'LOW_CONFIDENCE' | 'PROVIDER_ERROR' | 'MOCK';
+  provider_name?: string;
+  is_mock?: boolean;
+  supported?: boolean;
+  candidates?: DiseaseCandidate[];
+  provider_status?: 'OK' | 'UNSUPPORTED_CROP' | 'LOW_CONFIDENCE' | 'PROVIDER_ERROR' | 'MOCK' | string;
   error_message?: string;
+  status?: string;
+  scientific_name?: string;
+  message?: string;
+  category_warning?: string;
 }
 
 export interface DiagnosisValidationResult {
@@ -79,6 +87,8 @@ export interface NACLProductRecommendation {
   efficacy_rank?: number;
   benefit_badge?: string;
   benefit_reason?: string;
+  application_guidelines?: string;
+  key_benefits?: string[];
 }
 
 export interface ProductRecommendationResult {
@@ -96,6 +106,7 @@ export interface LeafDiseaseAnalysisResponse {
   timestamp: string;
   status: 'SUCCESS' | 'UNCERTAIN' | 'FAILED';
   validation?: OverallImageValidationResult;
+  image_validation?: any;
   crop: CropIdentificationResult;
   disease?: NormalizedDiseaseResult;
   diagnosis?: DiagnosisValidationResult;
@@ -103,6 +114,19 @@ export interface LeafDiseaseAnalysisResponse {
   weed?: any;
   cross_validation?: any;
   source?: string;
+  image_url?: string;
+  advisory?: any;
+  advisory_id?: string;
+  has_advisory?: boolean;
+  parent_analysis_id?: string;
+  geolocation?: string;
+  season?: string;
+  seasonal_risk?: any;
+  cultural_remedies?: string[];
+  chemical_management?: string[];
+  nacl_products?: NACLProductRecommendation[];
+  ai_advisory_summary?: string;
+  notes?: string[];
   nacl_recommendations?: ProductRecommendationResult;
   retry_guidance?: string;
   phase_notice?: string;

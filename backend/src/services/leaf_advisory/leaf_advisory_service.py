@@ -58,7 +58,7 @@ class LeafAdvisoryService:
         Retrieves recent historical diagnoses from 'ldd_inspections' MongoDB collection.
         Returns normalized diagnostic records suitable for advisory selection.
         """
-        query: Dict[str, Any] = {}
+        query: Dict[str, Any] = {"source": {"$ne": "LEAF_ADVISORY"}}
         if user_id:
             query["user_id"] = user_id
 

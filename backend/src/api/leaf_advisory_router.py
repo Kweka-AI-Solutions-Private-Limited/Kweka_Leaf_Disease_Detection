@@ -103,13 +103,70 @@ def generate_advisory(
         result = service.generate_advisory(request)
 
         # 1. Persist to user-isolated collection 'ldd_advisories'
+        adv_doc = result.model_dump(mode="json")
+        adv_doc["user_id"] = user_id
+        adv_doc["created_at"] = datetime.now(timezone.utc)
         try:
-            adv_doc = result.model_dump(mode="json")
-            adv_doc["user_id"] = user_id
-            adv_doc["created_at"] = datetime.now(timezone.utc)
-            db["ldd_advisories"].insert_one(adv_doc)
+            db["ldd_advisories"].insert_one(adv_doc.copy())
         except Exception as e:
             print(f"[WARN] Failed to persist advisory to ldd_advisories: {e}")
+
+        # 1b. Persist as an inspection history record in 'ldd_inspections' for History timeline
+        try:
+            history_entry = {
+                "analysis_id": result.advisory_id,
+                "source": "LEAF_ADVISORY",
+                "status": "SUCCESS",
+                "user_id": user_id,
+                "created_at": datetime.now(timezone.utc),
+                "timestamp": result.timestamp,
+                "crop": {
+                    "crop_name": result.crop_name,
+                    "status": "CONFIRMED"
+                },
+                "disease": {
+                    "disease_name": result.disease_name or "None",
+                    "status": "CONFIRMED" if result.disease_name else "NOT_DETECTED"
+                } if result.disease_name else None,
+                "pest": {
+                    "primary_pest": result.pest_name or "No pest detected",
+                    "status": "CONFIRMED" if result.pest_name else "NO_PEST_DETECTED"
+                } if result.pest_name else None,
+                "geolocation": result.geolocation,
+                "season": result.season,
+                "seasonal_risk": result.seasonal_risk.model_dump() if result.seasonal_risk else None,
+                "advisory": adv_doc,
+                "nacl_products": [p.model_dump() for p in result.nacl_products],
+                "cultural_remedies": result.cultural_remedies,
+                "chemical_management": result.chemical_management,
+                "ai_advisory_summary": result.ai_advisory_summary,
+                "image_url": result.image_url or request.image_url,
+                "parent_analysis_id": request.analysis_id
+            }
+            db["ldd_inspections"].insert_one(history_entry)
+        except Exception as e:
+            print(f"[WARN] Failed to persist advisory history entry to ldd_inspections: {e}")
+
+        # 1c. If requested for a specific prior inspection analysis_id, link advisory directly to it
+        if request.analysis_id:
+            try:
+                db["ldd_inspections"].update_one(
+                    {
+                        "$and": [
+                            {"$or": [{"analysis_id": request.analysis_id}, {"_id": request.analysis_id}]},
+                            {"user_id": user_id}
+                        ]
+                    },
+                    {
+                        "$set": {
+                            "advisory": adv_doc,
+                            "advisory_id": result.advisory_id,
+                            "has_advisory": True
+                        }
+                    }
+                )
+            except Exception as e:
+                print(f"[WARN] Failed to link advisory to inspection '{request.analysis_id}': {e}")
 
         # 2. Log activity with user_id context
         condition_label = request.disease_name or request.pest_name or "General Health"
