@@ -1365,17 +1365,19 @@ export const LeafDiseasePage: React.FC = () => {
                       </span>
                     </div>
 
-                    {/* Active Ingredient & FRAC Group */}
-                    {(prod.active_ingredient || prod.frac_group) && (
-                      <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-[#fdf3ed]/80 border border-[#f5d5c0]/60 text-xs font-mono text-[#b85119] font-extrabold">
-                        <span className="truncate">Active: {prod.active_ingredient || 'Formulated Agrochemical'}</span>
-                        {prod.frac_group && (
-                          <span className="px-1.5 py-0.5 rounded bg-[#fdeade] text-[#8f390e] text-[9px] shrink-0">
-                            {prod.frac_group}
-                          </span>
-                        )}
-                      </div>
-                    )}
+                    {/* Active Ingredient & Beneficial Rank Badge */}
+                    <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-[#fdf3ed]/80 border border-[#f5d5c0]/60 text-xs font-mono text-[#b85119] font-extrabold">
+                      <span className="truncate">Active: {prod.active_ingredient || 'Formulated Agrochemical'}</span>
+                      {prod.benefit_badge ? (
+                        <span className="px-1.5 py-0.5 rounded bg-[#fdeade] text-[#8f390e] text-[9px] font-bold shrink-0">
+                          {prod.benefit_badge}
+                        </span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 rounded bg-[#fdeade] text-[#8f390e] text-[9px] font-bold shrink-0">
+                          Rank #{idx + 1}
+                        </span>
+                      )}
+                    </div>
 
                     {/* Rationale */}
                     <p className="text-xs text-industrial-700 bg-industrial-50 p-2.5 rounded-xl border border-industrial-100 leading-relaxed font-medium">

@@ -54,8 +54,10 @@ class NACLProductRecommendation(BaseModel):
     verification_reason: str = Field("", description="Detailed backend audit log of validation decision")
     pack_sizes: List[str] = Field(default_factory=list, description="Commercial packaging options")
     source_url: Optional[str] = Field(None, description="Authoritative source URL")
-    source_type: Optional[str] = Field(None, description="OFFICIAL_NACL_WEBSITE, OFFICIAL_LABEL, REGULATORY")
-    frac_group: Optional[str] = Field(None, description="Verified FRAC code/group")
+    frac_group: Optional[str] = Field(None, description="Verified FRAC code/group (deprecated)")
+    efficacy_rank: int = Field(1, description="Beneficial rank: 1 = Top Pick / Most Beneficial, 2 = High Efficacy, etc.")
+    benefit_badge: Optional[str] = Field(None, description="Human readable beneficial rank badge, e.g. Rank #1 • Top Pick")
+    benefit_reason: Optional[str] = Field(None, description="Agronomic rationale explaining why this product is beneficial for the target")
 
 
 class ProductRecommendationResult(BaseModel):

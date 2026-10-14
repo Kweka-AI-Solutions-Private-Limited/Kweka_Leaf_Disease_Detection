@@ -200,7 +200,7 @@ class LeafAdvisoryService:
         disease_name: str,
         pest_name: str
     ) -> List[NACLProductRecommendation]:
-        """Queries and normalizes matching NACL catalog products for the crop, disease, and pest."""
+        """Queries, normalizes, and ranks matching NACL catalog products by beneficial efficacy."""
         recs: List[NACLProductRecommendation] = []
         seen_ids = set()
 
@@ -230,7 +230,7 @@ class LeafAdvisoryService:
                             recommended_dosage=app_dosage,
                             match_rationale=f"Registered NACL fungicide for {disease_name} on {crop_name}.",
                             pack_sizes=p.get("pack_sizes", []),
-                            frac_group=p.get("frac_group")
+                            frac_group=None
                         )
                     )
 
@@ -260,11 +260,11 @@ class LeafAdvisoryService:
                             recommended_dosage=app_dosage,
                             match_rationale=f"Registered NACL insecticide for {pest_name} management on {crop_name}.",
                             pack_sizes=p.get("pack_sizes", []),
-                            frac_group=p.get("frac_group")
+                            frac_group=None
                         )
                     )
 
-        # Step 3: Broad category fallback if fewer than 2 products found
+        # Step 3: Broad category fallback if fewer than 3 products found
         if len(recs) < 3:
             target_cat = "Insecticide" if pest_name and not disease_name else "Fungicide"
             fallback_prods = query_nacl_products(category=target_cat, db=self.db)
@@ -285,13 +285,58 @@ class LeafAdvisoryService:
                             recommended_dosage=p.get("crop_applications", [{}])[0].get("dosage", "Refer to current product label"),
                             match_rationale=f"NACL {target_cat} formulation for crop protection.",
                             pack_sizes=p.get("pack_sizes", []),
-                            frac_group=p.get("frac_group")
+                            frac_group=None
                         )
                     )
                 if len(recs) >= 4:
                     break
 
-        return recs[:4]
+        # Step 4: Rank verified remedies by beneficial suitability
+        target_str = (disease_name or pest_name or "").lower()
+        crop_clean = (crop_name or "").lower()
+
+        scored: List[Tuple[int, NACLProductRecommendation]] = []
+        for r in recs:
+            score = 0
+            if r.match_type in ("VERIFIED_DISEASE_MATCH", "VERIFIED_PEST_MATCH", "VERIFIED_DIRECT_MATCH"):
+                score += 60
+            elif r.verification_status == "VERIFIED_CROP_TARGET_MATCH":
+                score += 45
+            else:
+                score += 15
+
+            if r.dosage_verified and r.recommended_dosage and "refer" not in r.recommended_dosage.lower():
+                score += 30
+
+            if crop_clean and crop_clean in r.match_rationale.lower():
+                score += 20
+
+            if target_str and any(w in r.match_rationale.lower() for w in target_str.split() if len(w) > 3):
+                score += 15
+
+            scored.append((score, r))
+
+        scored.sort(key=lambda x: x[0], reverse=True)
+
+        ranked_recs: List[NACLProductRecommendation] = []
+        for idx, (_, r) in enumerate(scored[:4]):
+            rank = idx + 1
+            r.efficacy_rank = rank
+            if rank == 1:
+                r.benefit_badge = "Rank #1 • Top Pick"
+                r.benefit_reason = f"Most beneficial remedy with verified registration for {crop_name} and direct {disease_name or pest_name or 'target'} control."
+            elif rank == 2:
+                r.benefit_badge = "Rank #2 • High Efficacy Alternative"
+                r.benefit_reason = "Strong secondary curative treatment offering targeted systemic canopy protection."
+            elif rank == 3:
+                r.benefit_badge = "Rank #3 • Broad-Spectrum Option"
+                r.benefit_reason = "Versatile broad-spectrum protection for complementary pathogen suppression."
+            else:
+                r.benefit_badge = f"Rank #{rank} • Supportive Option"
+                r.benefit_reason = "Supplementary protective remedy from the NACL catalog."
+            ranked_recs.append(r)
+
+        return ranked_recs
 
     def _synthesize_gemini_advisory(
         self,
@@ -305,17 +350,20 @@ class LeafAdvisoryService:
         """Calls Gemini with crop, diagnosis, optional geolocation, and season to produce tailored advice."""
         client = _get_gemini_client()
 
-        # Build verified product descriptions
+        # Build verified product descriptions ranked by beneficial suitability
         products_text = ""
         for r in recommendations:
             dosage = r.recommended_dosage or "Refer to product label"
-            frac = f" (FRAC/IRAC: {r.frac_group})" if r.frac_group else ""
-            products_text += f"- {r.product_name} ({r.category}): Active ingredient '{r.active_ingredient}'{frac}. Dosage: {dosage}.\n"
+            badge = r.benefit_badge or f"Rank #{r.efficacy_rank}"
+            products_text += f"- [{badge}] {r.product_name} ({r.category}): Active ingredient '{r.active_ingredient or 'Formulated Agrochemical'}'. Prescribed Dosage: {dosage}. Beneficial Rationale: {r.benefit_reason or r.match_rationale}.\n"
 
         geo_desc = geolocation if geolocation else "General agricultural zone (unspecified region)"
         season_desc = season if season else "Standard growing season (unspecified climate)"
 
         # Fallback dictionary if Gemini is unavailable
+        top_name = recommendations[0].product_name if recommendations else "verified NACL product"
+        alt_name = recommendations[1].product_name if len(recommendations) > 1 else "an alternative formulation"
+
         fallback_data = {
             "climate_factors": (
                 f"Under {season_desc} in {geo_desc}, ambient temperature and canopy microclimate strongly influence "
@@ -328,8 +376,9 @@ class LeafAdvisoryService:
             ),
             "ai_advisory_summary": (
                 f"For the protection of {crop_name} affected by {disease_name or pest_name or 'foliar stress'}, "
-                f"an integrated crop management approach combining cultural sanitation and targeted NACL chemistries is recommended. "
-                f"Ensure even canopy coverage and follow recommended label dosages."
+                f"the top recommended remedy is {top_name}, which provides high beneficial efficacy against the identified symptoms. "
+                f"An integrated crop management approach combining cultural sanitation and targeted foliar application is recommended. "
+                f"Ensure even canopy coverage and follow prescribed label dosages."
             ),
             "cultural_remedies": [
                 f"Prune and destroy heavily infested lower leaves to reduce pathogen inoculum.",
@@ -338,8 +387,8 @@ class LeafAdvisoryService:
                 f"Ensure balanced nitrogen fertilization; avoid excessive nitrogen that promotes lush, susceptible foliage."
             ],
             "chemical_management": [
-                f"Apply verified NACL formulations targeting early symptom onset.",
-                f"Rotate products with different FRAC/IRAC modes of action to prevent resistance development.",
+                f"Prioritize applying {top_name} (Rank #1 Top Pick) at early symptom onset for maximum curative control.",
+                f"If secondary flushes appear or sequential spraying is needed, alternate with {alt_name} (Rank #2).",
                 f"Use flat-fan nozzles at 30-40 PSI pressure for uniform foliar droplet deposition."
             ]
         }
@@ -363,17 +412,18 @@ DIAGNOSTIC DETAILS:
 - Geolocation / Region: {geo_desc}
 - Season: {season_desc}
 
-VERIFIED NACL AGROCHEMICAL CATALOG PRODUCTS AVAILABLE:
+RANKED NACL AGROCHEMICAL CATALOG REMEDIES (Ranked from most beneficial to supportive):
 {products_text if products_text else 'No direct registered products in current catalog index.'}
 
 INSTRUCTIONS:
 Synthesize a comprehensive, practical agronomic advisory tailored to the crop condition, regional context, and season (or general best practices if region/season are unspecified).
+Explain to the farmer why the Rank #1 remedy is the most beneficial treatment, and how to use the secondary alternatives if follow-up is needed.
 Respond ONLY with a valid JSON object matching this schema:
 {{
   "climate_factors": "2-3 sentences explaining how this specific season and region (or general humidity/temperature) impact the life cycle, spore propagation, or pest feeding pressure.",
   "disease_pressure_level": "HIGH or MODERATE or LOW",
   "weather_spray_window_advice": "Specific recommendation on optimal spraying time of day, wind speed, rain avoidance, or temperature safety window for this season.",
-  "ai_advisory_summary": "2-3 paragraphs providing an agronomist advisory explaining what the farmer is facing, how the recommended NACL active ingredients resolve it, and what immediate action is required.",
+  "ai_advisory_summary": "2-3 paragraphs providing an agronomist advisory explaining what the farmer is facing, why the Rank #1 NACL remedy is most beneficial, and what immediate action is required.",
   "cultural_remedies": [
     "Practical cultural/agronomic remedy 1 (drainage, spacing, sanitation)",
     "Practical cultural/agronomic remedy 2",
@@ -381,12 +431,13 @@ Respond ONLY with a valid JSON object matching this schema:
     "Practical cultural/agronomic remedy 4"
   ],
   "chemical_management": [
-    "Specific instruction on applying the verified NACL chemistries",
-    "Resistance management guidance (FRAC/IRAC rotation)",
-    "Spraying safety and application equipment tips"
+    "Specific instruction on applying the Rank #1 top beneficial remedy",
+    "Sequencing advice: when to alternate with the Rank #2 alternative for sustained protection",
+    "Spraying safety, calibration, and canopy deposition tips"
   ]
 }}
 Do not invent unverified brands outside of the provided NACL products.
+Do not mention FRAC or IRAC resistance codes.
 """
 
         for m in models_to_try:

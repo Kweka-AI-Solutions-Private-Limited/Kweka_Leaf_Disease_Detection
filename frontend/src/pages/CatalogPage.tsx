@@ -143,11 +143,6 @@ export const CatalogPage: React.FC = () => {
                       {prod.product_name}
                     </h3>
                   </div>
-                  {prod.frac_group && (
-                    <span className="px-2 py-0.5 rounded bg-warmgray-100 text-warmgray-700 text-[10px] font-mono font-bold shrink-0">
-                      {prod.frac_group}
-                    </span>
-                  )}
                 </div>
 
                 {prod.active_ingredient && (

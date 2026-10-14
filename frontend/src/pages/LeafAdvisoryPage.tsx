@@ -1139,7 +1139,7 @@ export const LeafAdvisoryPage: React.FC = () => {
                     Verified Remedies from NACL Product Catalog
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Statutory registered formulations with verified dosage, active ingredient, and FRAC/IRAC code.
+                    Statutory registered formulations ranked by beneficial efficacy, host suitability, and prescribed field dosage.
                   </p>
                 </div>
               </div>
@@ -1211,13 +1211,13 @@ export const LeafAdvisoryPage: React.FC = () => {
                       <th className="py-3 px-4">Product & Trade Name</th>
                       <th className="py-3 px-3">Category</th>
                       <th className="py-3 px-4">Active Chemical Ingredient</th>
-                      <th className="py-3 px-3">FRAC / IRAC Code</th>
+                      <th className="py-3 px-3">Beneficial Rank</th>
                       <th className="py-3 px-4">Prescribed Field Dosage</th>
                       <th className="py-3 px-4 text-right">Official Catalog Link</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#eae4dc] bg-white">
-                    {filteredProducts.map((prod) => (
+                    {filteredProducts.map((prod, idx) => (
                       <tr key={prod.product_id} className="hover:bg-[#fdf3ed]/40 transition-colors">
                         <td className="py-3.5 px-4 font-extrabold text-slate-900">
                           <div className="flex items-center gap-2">
@@ -1234,12 +1234,30 @@ export const LeafAdvisoryPage: React.FC = () => {
                           {prod.active_ingredient || 'Formulated Agrochemical'}
                         </td>
                         <td className="py-3.5 px-3">
-                          {prod.frac_group ? (
-                            <span className="font-mono text-[10px] bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded font-bold">
-                              {prod.frac_group}
+                          {prod.benefit_badge ? (
+                            <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold border ${
+                              prod.efficacy_rank === 1
+                                ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                : prod.efficacy_rank === 2
+                                ? 'bg-blue-100 text-blue-800 border-blue-200'
+                                : prod.efficacy_rank === 3
+                                ? 'bg-amber-100 text-amber-800 border-amber-200'
+                                : 'bg-slate-100 text-slate-700 border-slate-200'
+                            }`} title={prod.benefit_reason}>
+                              {prod.efficacy_rank === 1 && <Sparkles className="w-3 h-3 text-emerald-600" />}
+                              <span>{prod.benefit_badge}</span>
                             </span>
                           ) : (
-                            <span className="text-slate-400 text-[10px]">—</span>
+                            <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold border ${
+                              idx === 0
+                                ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                : idx === 1
+                                ? 'bg-blue-100 text-blue-800 border-blue-200'
+                                : 'bg-slate-100 text-slate-700 border-slate-200'
+                            }`}>
+                              {idx === 0 && <Sparkles className="w-3 h-3 text-emerald-600" />}
+                              <span>{idx === 0 ? 'Rank #1 • Top Pick' : idx === 1 ? 'Rank #2 • High Efficacy' : `Rank #${idx + 1}`}</span>
+                            </span>
                           )}
                         </td>
                         <td className="py-3.5 px-4 font-bold text-[#d96b27]">
@@ -1266,19 +1284,35 @@ export const LeafAdvisoryPage: React.FC = () => {
             ) : (
               /* MODERN PRODUCT CARD GRID VIEW */
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {filteredProducts.map((prod) => (
+                {filteredProducts.map((prod, idx) => (
                   <div
                     key={prod.product_id}
                     className="p-4 rounded-xl border border-[#eae4dc] bg-[#fbf9f5] hover:bg-white hover:border-[#d96b27] transition-all shadow-xs flex flex-col justify-between space-y-3 group"
                   >
                     <div>
-                      <div className="flex items-center justify-between text-[11px] mb-1.5">
+                      <div className="flex items-center justify-between text-[11px] mb-1.5 gap-2">
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#fdeade] text-[#d96b27]">
                           {prod.category}
                         </span>
-                        {prod.frac_group && (
-                          <span className="text-[10px] font-mono text-slate-500 bg-white border border-slate-200 px-1.5 py-0.5 rounded font-bold">
-                            {prod.frac_group}
+                        {prod.benefit_badge ? (
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 ${
+                            prod.efficacy_rank === 1
+                              ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                              : prod.efficacy_rank === 2
+                              ? 'bg-blue-50 text-blue-700 border-blue-200'
+                              : 'bg-white text-slate-600 border-slate-200'
+                          }`}>
+                            {prod.efficacy_rank === 1 && <Sparkles className="w-2.5 h-2.5 text-emerald-600" />}
+                            <span>{prod.benefit_badge}</span>
+                          </span>
+                        ) : (
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 ${
+                            idx === 0
+                              ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                              : 'bg-white text-slate-600 border-slate-200'
+                          }`}>
+                            {idx === 0 && <Sparkles className="w-2.5 h-2.5 text-emerald-600" />}
+                            <span>{idx === 0 ? 'Rank #1 • Top Pick' : `Rank #${idx + 1}`}</span>
                           </span>
                         )}
                       </div>
@@ -1383,7 +1417,7 @@ export const LeafAdvisoryPage: React.FC = () => {
                   <h4 className="text-sm font-bold text-slate-900">
                     Application Technique & Resistance Management
                   </h4>
-                  <span className="text-[10px] text-slate-400">FRAC/IRAC compliance & sprayer calibration</span>
+                  <span className="text-[10px] text-slate-400">Beneficial remedy prioritization & sprayer calibration</span>
                 </div>
               </div>
 

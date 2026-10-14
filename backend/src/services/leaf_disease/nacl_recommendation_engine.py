@@ -309,7 +309,7 @@ class NACLRecommendationEngine:
                     pack_sizes=prod.get("pack_sizes", []),
                     source_url=prod.get("source_url") or prod.get("product_url"),
                     source_type=prod.get("source_type", "OFFICIAL_NACL_WEBSITE"),
-                    frac_group=prod.get("frac_group")
+                    frac_group=None
                 )
                 recommendations.append(rec)
                 seen_ids.add(p_id)
@@ -337,12 +337,59 @@ class NACLRecommendationEngine:
                     pack_sizes=prod.get("pack_sizes", []),
                     source_url=prod.get("source_url") or prod.get("product_url"),
                     source_type="OFFICIAL_NACL_WEBSITE",
-                    frac_group=prod.get("frac_group")
+                    frac_group=None
                 )
                 recommendations.append(rec)
                 seen_ids.add(p_id)
                 if len(recommendations) >= 5:
                     break
+
+        # Step 3C: Rank verified remedies by beneficial suitability
+        target_str = (disease_name or "").lower()
+        crop_clean = (crop_name or "").lower()
+
+        scored: List[Tuple[int, NACLProductRecommendation]] = []
+        for r in recommendations:
+            score = 0
+            if r.verification_status in ("VERIFIED_DIRECT_MATCH", "VERIFIED_DISEASE_MATCH", "VERIFIED_PEST_MATCH"):
+                score += 60
+            elif r.verification_status == "VERIFIED_CROP_TARGET_MATCH":
+                score += 45
+            else:
+                score += 15
+
+            if r.dosage_verified and r.recommended_dosage and "refer" not in r.recommended_dosage.lower():
+                score += 30
+
+            if crop_clean and crop_clean in r.match_rationale.lower():
+                score += 20
+
+            if target_str and any(w in r.match_rationale.lower() for w in target_str.split() if len(w) > 3):
+                score += 15
+
+            scored.append((score, r))
+
+        scored.sort(key=lambda x: x[0], reverse=True)
+
+        ranked_recs: List[NACLProductRecommendation] = []
+        for idx, (_, r) in enumerate(scored[:5]):
+            rank = idx + 1
+            r.efficacy_rank = rank
+            if rank == 1:
+                r.benefit_badge = "Rank #1 • Top Pick"
+                r.benefit_reason = f"Most beneficial formulation with registered target control for {crop_name or 'the host crop'}."
+            elif rank == 2:
+                r.benefit_badge = "Rank #2 • High Efficacy Alternative"
+                r.benefit_reason = "Strong secondary curative treatment offering targeted foliar protection."
+            elif rank == 3:
+                r.benefit_badge = "Rank #3 • Broad-Spectrum Option"
+                r.benefit_reason = "Versatile broad-spectrum protection for complementary disease management."
+            else:
+                r.benefit_badge = f"Rank #{rank} • Supportive Option"
+                r.benefit_reason = "Supplementary protective remedy from the NACL catalog."
+            ranked_recs.append(r)
+
+        recommendations = ranked_recs
 
         # 4. Extract Recommended Active Ingredients
         active_ingredients = [
@@ -376,18 +423,19 @@ class NACLRecommendationEngine:
         """Calls Gemini VLM/LLM to generate a professional agronomist advisory summary from verified product facts."""
         client, model_name = _get_gemini_client()
         
-        # Build verified product descriptions string
+        # Build verified product descriptions string ranked by beneficial suitability
         verified_facts_str = ""
         for r in recommendations[:3]:
             dosage_str = r.recommended_dosage if r.dosage_verified else "Refer to current product label"
-            frac_str = f" ({r.frac_group})" if r.frac_group else ""
-            verified_facts_str += f"- Product: {r.product_name}, Active: {r.active_ingredient or 'Formulated Fungicide'}{frac_str}, Dosage: {dosage_str}\n"
+            badge_str = f" [{r.benefit_badge}]" if r.benefit_badge else f" [Rank #{r.efficacy_rank}]"
+            verified_facts_str += f"- Product:{badge_str} {r.product_name}, Active: {r.active_ingredient or 'Formulated Fungicide'}, Prescribed Dosage: {dosage_str}\n"
 
         # Fallback template if Gemini client is unavailable
+        top_name = recommendations[0].product_name if recommendations else "verified NACL product"
         template_advisory = (
-            f"For controlling {disease_name} on {crop_name}, apply verified products according to label instructions. "
+            f"For controlling {disease_name} on {crop_name}, apply the top recommended remedy {top_name} according to prescribed label instructions. "
             f"Ensure uniform foliage spray coverage during cool morning or late afternoon hours. "
-            f"Rotate chemical active ingredients across FRAC groups to prevent pathogen resistance development."
+            f"Alternate with secondary formulations if sequential spraying is required for complete recovery."
         )
 
         if not client or not verified_facts_str:
@@ -397,16 +445,16 @@ class NACLRecommendationEngine:
             prompt = (
                 f"You are a senior agricultural plant pathologist and agronomist.\n"
                 f"A farmer's {crop_name} crop has been diagnosed with '{disease_name}'.\n\n"
-                f"Below are backend-VERIFIED NACL product facts:\n"
+                f"Below are backend-VERIFIED NACL remedies ranked by beneficial efficacy:\n"
                 f"{verified_facts_str}\n"
                 f"CRITICAL RULES:\n"
                 f"1. DO NOT invent or assume any product registration or dosages not listed above.\n"
-                f"2. DO NOT change or guess FRAC groups. Use ONLY the FRAC classifications provided above if mentioning resistance management.\n"
-                f"3. If dosage says 'Refer to current product label', DO NOT invent numerical dosage values.\n\n"
+                f"2. If dosage says 'Refer to current product label', DO NOT invent numerical dosage values.\n"
+                f"3. Do not mention FRAC or IRAC resistance codes.\n\n"
                 f"Provide a concise 3-sentence agronomist treatment guide covering:\n"
-                f"1. How the verified product active ingredients control {disease_name}.\n"
-                f"2. Foliar application best practices and weather timing.\n"
-                f"3. Resistance management advice based on FRAC rotation.\n"
+                f"1. Why the Rank #1 remedy is most beneficial to control {disease_name} on {crop_name}.\n"
+                f"2. Foliar application best practices, sprayer nozzle pressure, and weather timing.\n"
+                f"3. Sequential management advice on alternating with the secondary remedy for sustained protection.\n"
                 f"Keep it professional, encouraging, and clear for farmers."
             )
 

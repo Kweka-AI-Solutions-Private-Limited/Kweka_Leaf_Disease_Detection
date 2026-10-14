@@ -75,8 +75,10 @@ export interface NACLProductRecommendation {
   verification_reason?: string;
   pack_sizes: string[];
   source_url?: string;
-  source_type?: string;
   frac_group?: string;
+  efficacy_rank?: number;
+  benefit_badge?: string;
+  benefit_reason?: string;
 }
 
 export interface ProductRecommendationResult {
