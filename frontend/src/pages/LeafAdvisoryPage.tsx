@@ -554,12 +554,13 @@ export const LeafAdvisoryPage: React.FC = () => {
             {/* Context & Zero-Hallucination Quality Banner */}
             <div className="p-4 bg-[#fdf3ed] border border-[#f5d5c0] rounded-xl flex items-start gap-3">
               <Sparkles className="w-5 h-5 text-[#d96b27] shrink-0 mt-0.5" />
-              <div className="text-xs text-warmgray-900 space-y-0.5">
+              <div className="text-xs text-warmgray-900 space-y-1">
                 <span className="font-bold">Precision Diagnosis & Zero-Hallucination Agronomy:</span>
                 <p className="text-warmgray-600 leading-relaxed">
-                  To ensure our agronomist engine provides 100% verified, safe, and effective solutions without hallucination,
-                  we capture essential field parameters below. Chemical solutions will strictly match your crop and symptoms,
-                  accompanied by exact bottle packaging counts, water dilution volumes, and pollinator safety gating.
+                  To tailor bottle counts, dilution water, and safety timings (pollinator & harvest safety), select your field parameters below.
+                </p>
+                <p className="text-[#b95011] font-medium bg-[#fde8dc] px-2.5 py-1.5 rounded-lg border border-[#f5c6aa] mt-1">
+                  💡 <strong>Unable to provide these inputs or unsure?</strong> No problem! You can select <strong>&quot;Not Sure / Standard&quot;</strong> on any item, or click <strong>&quot;Quick Generate (Standard Label Rate)&quot;</strong> below. Chemical remedies are strictly governed by your diagnosed crop and disease, so you will always receive 100% verified solutions!
                 </p>
               </div>
             </div>
@@ -591,12 +592,13 @@ export const LeafAdvisoryPage: React.FC = () => {
                     {growthStage === 'Flowering' ? '⚠️ Activates Pollinator Safety Gating' : growthStage === 'Fruiting / Maturation' ? '⏱️ Activates Pre-Harvest Interval (PHI)' : 'Growth Phenology'}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                   {[
                     { label: 'Seedling', icon: '🌱', desc: 'Tender nursery / early root establishment' },
                     { label: 'Vegetative', icon: '🌿', desc: 'Active tillering, branch & canopy flush' },
                     { label: 'Flowering', icon: '🌸', desc: 'Bud formation & active pollination (Bee safety)' },
                     { label: 'Fruiting / Maturation', icon: '🍎', desc: 'Pod/fruit set & ripening (Residue safety)' },
+                    { label: 'Not Sure / Standard', icon: '❔', desc: 'Standard vegetative foliar dosage & safety' },
                   ].map((stage) => {
                     const isSel = growthStage === stage.label;
                     return (
@@ -635,11 +637,12 @@ export const LeafAdvisoryPage: React.FC = () => {
                   </label>
                   <span className="text-[10px] text-slate-400 font-medium">Infection Timeline</span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {[
-                    { label: '1-2 days ago (Acute)', badge: 'Acute Onset', desc: 'Immediate intervention window for maximum knockdown' },
-                    { label: '3-7 days ago', badge: 'Progressive', desc: 'Secondary lesion growth & established infection' },
-                    { label: '>1 week ago', badge: 'Chronic / Severe', desc: 'Chronic spread — triggers agronomist escalation' },
+                    { label: '1-2 days ago (Acute)', desc: 'Immediate intervention window for maximum knockdown' },
+                    { label: '3-7 days ago', desc: 'Secondary lesion growth & established infection' },
+                    { label: '>1 week ago', desc: 'Chronic spread — triggers agronomist escalation' },
+                    { label: 'Not Sure / Standard', desc: 'Standard curative/preventive foliar application' },
                   ].map((onset) => {
                     const isSel = onsetDays === onset.label;
                     return (
@@ -679,12 +682,13 @@ export const LeafAdvisoryPage: React.FC = () => {
                     {recentWeather.includes('Rainy') ? '💧 Recommends Spreader-Sticker Tank Mix' : 'Rainfastness & Evaporation Calibration'}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                   {[
                     { label: 'Clear & Dry', icon: '☀️', desc: 'Low moisture, normal evapotranspiration' },
                     { label: 'Rainy / High Humidity', icon: '🌧️', desc: 'Wet foliage, requires non-ionic sticker adjuvant' },
                     { label: 'High Heat (>32°C)', icon: '🌡️', desc: 'Foliar scorch risk; early morning spray only' },
                     { label: 'Overcast / Windy', icon: '💨', desc: 'High drift risk; calibrate nozzle droplet size' },
+                    { label: 'Not Sure / Normal', icon: '🌤️', desc: 'Standard early morning or evening foliar spray' },
                   ].map((w) => {
                     const isSel = recentWeather === w.label;
                     return (
@@ -725,11 +729,12 @@ export const LeafAdvisoryPage: React.FC = () => {
                     {previousTreatment.includes('Ineffective') ? '⚠️ Activates Mode-of-Action Resistance Rotation' : 'Anti-Resistance Protocol'}
                   </span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {[
                     { label: 'None (First Spray)', desc: 'Initial curative/preventive spray on naive crop' },
                     { label: 'Already Sprayed - Ineffective', desc: 'Prior chemical failed. Strictly rotates active ingredient group' },
                     { label: 'Rotational Spray', desc: 'Sequential follow-up spray adhering to IPM rotation' },
+                    { label: 'Not Sure / First Spray', desc: 'Standard baseline application adhering to label safety' },
                   ].map((treat) => {
                     const isSel = previousTreatment === treat.label;
                     return (
