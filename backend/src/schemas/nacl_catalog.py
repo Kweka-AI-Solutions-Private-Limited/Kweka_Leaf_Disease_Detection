@@ -58,6 +58,16 @@ class NACLProductRecommendation(BaseModel):
     efficacy_rank: int = Field(1, description="Beneficial rank: 1 = Top Pick / Most Beneficial, 2 = High Efficacy, etc.")
     benefit_badge: Optional[str] = Field(None, description="Human readable beneficial rank badge, e.g. Rank #1 • Top Pick")
     benefit_reason: Optional[str] = Field(None, description="Agronomic rationale explaining why this product is beneficial for the target")
+    calculated_total_dosage: Optional[str] = Field(None, description="Calculated total dosage volume/weight for farmer's acreage")
+    calculated_total_water: Optional[str] = Field(None, description="Calculated total dilution water volume for acreage")
+    calculated_bottles: Optional[str] = Field(None, description="Estimated commercial bottle packaging sizes required")
+    standard_label_dosage: Optional[str] = Field(None, description="Standard statutory per-acre label rate")
+    phi_days: Optional[int] = Field(None, description="Pre-Harvest Interval (days)")
+    rei_hours: Optional[int] = Field(None, description="Re-Entry Interval (hours)")
+    bee_toxicity_warning: Optional[str] = Field(None, description="Pollinator safety caution")
+    ppe_guidelines: Optional[str] = Field(None, description="Personal Protective Equipment instructions")
+    combination_partner: Optional[str] = Field(None, description="Recommended tank-mix partner or combination chemical")
+
 
 
 class ProductRecommendationResult(BaseModel):

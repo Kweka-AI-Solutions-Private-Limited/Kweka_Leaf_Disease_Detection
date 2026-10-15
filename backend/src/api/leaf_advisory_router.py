@@ -159,6 +159,11 @@ def generate_advisory(
                 "cultural_remedies": result.cultural_remedies,
                 "chemical_management": result.chemical_management,
                 "ai_advisory_summary": result.ai_advisory_summary,
+                "intake_summary": result.intake_summary,
+                "area_calculation_summary": result.area_calculation_summary,
+                "escalation_required": result.escalation_required,
+                "escalation_reason": result.escalation_reason,
+                "combination_guidance": result.combination_guidance,
                 "image_url": final_img,
                 "parent_analysis_id": request.analysis_id
             }

@@ -89,6 +89,15 @@ export interface NACLProductRecommendation {
   benefit_reason?: string;
   application_guidelines?: string;
   key_benefits?: string[];
+  calculated_total_dosage?: string;
+  calculated_total_water?: string;
+  calculated_bottles?: string;
+  standard_label_dosage?: string;
+  phi_days?: number;
+  rei_hours?: number;
+  bee_toxicity_warning?: string;
+  ppe_guidelines?: string;
+  combination_partner?: string;
 }
 
 export interface ProductRecommendationResult {

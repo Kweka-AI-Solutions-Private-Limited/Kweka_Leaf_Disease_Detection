@@ -83,3 +83,56 @@ def test_generate_advisory_optional_season_and_geolocation(mock_db):
     assert res.seasonal_risk.geolocation_name == "General Agricultural Region"
     assert len(res.cultural_remedies) >= 3
     assert len(res.chemical_management) >= 2
+
+
+def test_generate_advisory_with_intake_and_acreage(mock_db):
+    """Verifies that intake parameters, acreage calculations, pollinator alerts, and combinations work properly."""
+    service = LeafAdvisoryService(db=mock_db)
+    req = LeafAdvisoryRequest(
+        crop_name="Cucumber",
+        disease_name="Downy Mildew",
+        growth_stage="Flowering",
+        onset_days="1-2 days ago (Acute)",
+        recent_weather="Rainy / High Humidity",
+        previous_treatment="Already Sprayed - Ineffective",
+        area_sown=2.5,
+        area_unit="acres",
+        severity_level="Severe (>30%)"
+    )
+    res = service.generate_advisory(req)
+    assert res.advisory_id.startswith("adv_")
+    assert res.escalation_required is True
+    assert res.intake_summary is not None
+    assert res.intake_summary["growth_stage"] == "Flowering"
+    assert "2.5" in res.intake_summary["area_sown"]
+    assert res.area_calculation_summary is not None
+    assert "500 Liters" in res.area_calculation_summary
+    assert res.combination_guidance is not None
+    assert "Rainfastness" in res.combination_guidance or "Rotation" in res.combination_guidance
+
+    # If products matched (e.g. Kadak for Cucumber Downy Mildew), check dosage & safety
+    for p in res.nacl_products:
+        assert p.calculated_total_water is not None
+        assert "500 Liters" in p.calculated_total_water
+        assert p.bee_toxicity_warning is not None
+        assert "POLLINATOR" in p.bee_toxicity_warning
+
+
+def test_zero_hallucination_on_unregistered_issue(mock_db):
+    """Verifies that if no NACL product is registered for the crop/pathogen, NO random chemicals are recommended."""
+    service = LeafAdvisoryService(db=mock_db)
+    req = LeafAdvisoryRequest(
+        crop_name="Dragonfruit",
+        disease_name="Bacterial Soft Rot",
+        growth_stage="Vegetative",
+        recent_weather="Clear & Dry"
+    )
+    res = service.generate_advisory(req)
+    # Zero hallucination guarantee: no off-label NACL products injected
+    assert len(res.nacl_products) == 0
+    # Must still provide safe remedies
+    assert len(res.cultural_remedies) >= 3
+    assert len(res.chemical_management) >= 1
+    # Check that remedies address the issue safely
+    combined_text = (res.ai_advisory_summary + " " + " ".join(res.cultural_remedies) + " " + " ".join(res.chemical_management)).lower()
+    assert any(term in combined_text for term in ("bacterial", "sanitation", "drainage", "fertiliz", "irrigation", "prun", "nacl", "no registered"))

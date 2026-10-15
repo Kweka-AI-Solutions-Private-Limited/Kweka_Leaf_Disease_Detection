@@ -29,15 +29,35 @@ class AdvisoryHistoricalDiagnosisItem(BaseModel):
 class LeafAdvisoryRequest(BaseModel):
     """
     Request payload to generate personalized agronomic advisory.
-    geolocation and season are OPTIONAL.
+    Includes core mandatory intake (Location, Season, Growth Stage, Onset, Weather, Previous Treatment)
+    and optional extended agronomy context (Acreage, Sowing Date, Variety, Plant Parts, Irrigation, Notes).
     """
     analysis_id: Optional[str] = None
     crop_name: str
     disease_name: Optional[str] = None
     pest_name: Optional[str] = None
-    geolocation: Optional[str] = None  # Optional regional context (e.g., Punjab, Maharashtra)
-    season: Optional[str] = None       # Optional seasonal context (e.g., Kharif, Rabi, Zaid)
+    geolocation: Optional[str] = None  # Regional context (e.g., Punjab, Uttar Pradesh)
+    season: Optional[str] = None       # Seasonal context (e.g., Kharif, Rabi, Zaid)
     image_url: Optional[str] = None    # Specimen image preserved from diagnosis
+
+    # Core Intake Parameters
+    growth_stage: Optional[str] = None       # Seedling, Vegetative, Flowering, Fruiting / Maturation
+    onset_days: Optional[str] = None         # 1-2 days ago (Acute), 3-7 days ago, >1 week ago
+    recent_weather: Optional[str] = None     # Clear & Dry, Rainy / High Humidity, High Heat, Overcast / Windy
+    previous_treatment: Optional[str] = None # None (First Spray), Already Sprayed - Ineffective, Rotational Spray
+
+    # Optional Extended Agronomy Parameters
+    area_sown: Optional[float] = None        # e.g., 2.5
+    area_unit: Optional[str] = "acres"       # "acres" or "hectares"
+    sowing_date: Optional[str] = None        # e.g. "2026-08-15"
+    crop_variety: Optional[str] = None       # e.g. "BT Cotton", "US-7067"
+    plant_part_affected: Optional[List[str]] = None  # e.g. ["Leaf", "Stem"]
+    irrigation_condition: Optional[str] = None       # Normal, Waterlogged / Flooded, Drought Stressed
+    severity_level: Optional[str] = None     # Mild (<10%), Moderate (10-30%), Severe (>30%)
+    farmer_name: Optional[str] = None
+    farmer_phone: Optional[str] = None
+    farmer_notes: Optional[str] = None
+    gps_coordinates: Optional[str] = None
 
 
 class SeasonalRiskAssessment(BaseModel):
@@ -64,8 +84,14 @@ class LeafAdvisoryResponse(BaseModel):
     cultural_remedies: List[str] = Field(default_factory=list)
     chemical_management: List[str] = Field(default_factory=list)
     image_url: Optional[str] = None
+    intake_summary: Optional[Dict[str, Any]] = None  # Structured farmer telemetry record
+    area_calculation_summary: Optional[str] = None    # Summary of total bottle & tank calculations for acreage
+    escalation_required: bool = False
+    escalation_reason: Optional[str] = None
+    combination_guidance: Optional[str] = None        # Scientifically verified tank-mix / combination advice
     safety_disclaimer: str = (
         "Advisory recommendations are generated based on identified foliar conditions, optional regional "
         "and seasonal climate inputs, and verified NACL product registrations. Follow statutory product label "
         "guidelines and local agronomist counsel prior to chemical application."
     )
+

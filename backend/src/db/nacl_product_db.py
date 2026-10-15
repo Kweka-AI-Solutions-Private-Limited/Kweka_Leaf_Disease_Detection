@@ -118,7 +118,8 @@ def query_nacl_products(
     filter_query: Dict[str, Any] = {}
 
     if category:
-        filter_query["category"] = {"$regex": f"^{category}$", "$options": "i"}
+        cat_clean = category.strip().rstrip("s")
+        filter_query["category"] = {"$regex": f"^{cat_clean}s?$", "$options": "i"}
 
     # Flexible regex query for crop
     if crop_name and crop_name.lower() != "unknown":

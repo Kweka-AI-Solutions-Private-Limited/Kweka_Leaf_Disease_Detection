@@ -22,6 +22,25 @@ export interface LeafAdvisoryRequest {
   geolocation?: string | null; // Optional
   season?: string | null;      // Optional
   image_url?: string | null;   // Specimen leaf image
+
+  // Mandatory / Core Quick Diagnosis Parameters
+  growth_stage?: string | null;       // Seedling, Vegetative, Flowering, Fruiting / Maturation
+  onset_days?: string | null;         // 1-2 days ago (Acute), 3-7 days ago, >1 week ago
+  recent_weather?: string | null;     // Clear & Dry, Rainy / High Humidity, High Heat, Overcast / Windy
+  previous_treatment?: string | null; // None (First Spray), Already Sprayed - Ineffective, Rotational Spray
+
+  // Optional Extended Agronomy Parameters
+  area_sown?: number | null;
+  area_unit?: string | null;
+  sowing_date?: string | null;
+  crop_variety?: string | null;
+  plant_part_affected?: string[] | null;
+  irrigation_condition?: string | null;
+  severity_level?: string | null;
+  farmer_name?: string | null;
+  farmer_phone?: string | null;
+  farmer_notes?: string | null;
+  gps_coordinates?: string | null;
 }
 
 export interface SeasonalRiskAssessment {
@@ -47,6 +66,11 @@ export interface LeafAdvisoryResponse {
   chemical_management: string[];
   safety_disclaimer: string;
   image_url?: string | null;
+  intake_summary?: Record<string, any> | null;
+  area_calculation_summary?: string | null;
+  escalation_required?: boolean;
+  escalation_reason?: string | null;
+  combination_guidance?: string | null;
 }
 
 export interface AdvisoryOptionsResponse {

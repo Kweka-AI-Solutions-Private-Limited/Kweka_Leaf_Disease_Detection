@@ -37,7 +37,14 @@ import {
   X,
   Scale,
   FlaskConical,
-  Compass
+  Compass,
+  ChevronDown,
+  ChevronUp,
+  Locate,
+  BadgeAlert,
+  Beaker,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 import {
   getAdvisoryHistory,
@@ -68,6 +75,27 @@ export const LeafAdvisoryPage: React.FC = () => {
   const [geolocation, setGeolocation] = useState<string>('');
   const [season, setSeason] = useState<string>('');
   const [optionsData, setOptionsData] = useState<AdvisoryOptionsResponse | null>(null);
+
+  // Mandatory Quick Diagnosis Intake
+  const [growthStage, setGrowthStage] = useState<string>('Vegetative');
+  const [onsetDays, setOnsetDays] = useState<string>('1-2 days ago (Acute)');
+  const [recentWeather, setRecentWeather] = useState<string>('Clear & Dry');
+  const [previousTreatment, setPreviousTreatment] = useState<string>('None (First Spray)');
+
+  // Optional Extended Agronomy Parameters
+  const [areaSown, setAreaSown] = useState<string>('1.0');
+  const [areaUnit, setAreaUnit] = useState<'acres' | 'hectares'>('acres');
+  const [sowingDate, setSowingDate] = useState<string>('');
+  const [cropVariety, setCropVariety] = useState<string>('');
+  const [plantPartsAffected, setPlantPartsAffected] = useState<string[]>(['Leaf']);
+  const [irrigationCondition, setIrrigationCondition] = useState<string>('Normal');
+  const [severityLevel, setSeverityLevel] = useState<string>('Moderate (10-30%)');
+  const [farmerName, setFarmerName] = useState<string>('');
+  const [farmerPhone, setFarmerPhone] = useState<string>('');
+  const [farmerNotes, setFarmerNotes] = useState<string>('');
+  const [gpsCoordinates, setGpsCoordinates] = useState<string>('');
+  const [isDetectingGps, setIsDetectingGps] = useState<boolean>(false);
+  const [showExtendedFields, setShowExtendedFields] = useState<boolean>(false);
 
   // Advisory Results & Loading
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
@@ -141,6 +169,31 @@ export const LeafAdvisoryPage: React.FC = () => {
     setErrorMessage(null);
   };
 
+  const handleDetectGps = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser.');
+      return;
+    }
+    setIsDetectingGps(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude.toFixed(4);
+        const lon = position.coords.longitude.toFixed(4);
+        const coordsStr = `${lat}, ${lon}`;
+        setGpsCoordinates(coordsStr);
+        if (!geolocation.trim()) {
+          setGeolocation(`GPS Location (${coordsStr})`);
+        }
+        setIsDetectingGps(false);
+      },
+      (err) => {
+        console.warn('Geolocation lookup failed:', err);
+        setIsDetectingGps(false);
+      },
+      { timeout: 10000 }
+    );
+  };
+
   const handleGenerateAdvisory = async (skipOptional = false) => {
     if (!selectedDiagnosis) return;
 
@@ -152,6 +205,8 @@ export const LeafAdvisoryPage: React.FC = () => {
     const candidateImg = specimenImageUrl || selectedDiagnosis.image_url || null;
     const resolvedSpecimen = candidateImg && !candidateImg.startsWith('blob:') ? candidateImg : null;
 
+    const parsedArea = areaSown.trim() ? parseFloat(areaSown) : null;
+
     try {
       const result = await generateLeafAdvisory({
         analysis_id: selectedDiagnosis.analysis_id,
@@ -161,6 +216,21 @@ export const LeafAdvisoryPage: React.FC = () => {
         geolocation: geoVal,
         season: seasonVal,
         image_url: resolvedSpecimen,
+        growth_stage: growthStage || null,
+        onset_days: onsetDays || null,
+        recent_weather: recentWeather || null,
+        previous_treatment: previousTreatment || null,
+        area_sown: parsedArea && !isNaN(parsedArea) && parsedArea > 0 ? parsedArea : null,
+        area_unit: areaUnit,
+        sowing_date: sowingDate.trim() || null,
+        crop_variety: cropVariety.trim() || null,
+        plant_part_affected: plantPartsAffected.length > 0 ? plantPartsAffected : null,
+        irrigation_condition: irrigationCondition || null,
+        severity_level: severityLevel || null,
+        farmer_name: farmerName.trim() || null,
+        farmer_phone: farmerPhone.trim() || null,
+        farmer_notes: farmerNotes.trim() || null,
+        gps_coordinates: gpsCoordinates.trim() || null,
       });
 
       // Guarantee specimen image is retained on the response object
@@ -183,6 +253,20 @@ export const LeafAdvisoryPage: React.FC = () => {
     setSpecimenImageUrl(null);
     setGeolocation('');
     setSeason('');
+    setGrowthStage('Vegetative');
+    setOnsetDays('1-2 days ago (Acute)');
+    setRecentWeather('Clear & Dry');
+    setPreviousTreatment('None (First Spray)');
+    setAreaSown('1.0');
+    setSowingDate('');
+    setCropVariety('');
+    setPlantPartsAffected(['Leaf']);
+    setIrrigationCondition('Normal');
+    setSeverityLevel('Moderate (10-30%)');
+    setFarmerName('');
+    setFarmerPhone('');
+    setFarmerNotes('');
+    setGpsCoordinates('');
     setAdvisoryResult(null);
     setErrorMessage(null);
     setSpecimenImageError(false);
@@ -465,98 +549,522 @@ export const LeafAdvisoryPage: React.FC = () => {
             </button>
           </div>
 
-          {/* Optional Geolocation & Season Setup Card */}
-          <div className="bg-white border border-[#eae4dc] rounded-2xl p-6 sm:p-8 shadow-xs space-y-6">
+          {/* Farmer Problem — Quick Diagnosis Capture & Context Setup */}
+          <div className="bg-white border border-[#eae4dc] rounded-2xl p-6 sm:p-8 shadow-xs space-y-7">
+            {/* Context & Zero-Hallucination Quality Banner */}
             <div className="p-4 bg-[#fdf3ed] border border-[#f5d5c0] rounded-xl flex items-start gap-3">
               <Sparkles className="w-5 h-5 text-[#d96b27] shrink-0 mt-0.5" />
               <div className="text-xs text-warmgray-900 space-y-0.5">
-                <span className="font-bold">Geolocation & Season are Completely Optional:</span>
+                <span className="font-bold">Precision Diagnosis & Zero-Hallucination Agronomy:</span>
                 <p className="text-warmgray-600 leading-relaxed">
-                  If you know your region or current crop season, select them below for weather-tuned spray windows and climate risk analysis.
-                  If you do not know them, you can skip this step and still receive full agronomic advice and NACL Catalog remedies!
+                  To ensure our agronomist engine provides 100% verified, safe, and effective solutions without hallucination,
+                  we capture essential field parameters below. Chemical solutions will strictly match your crop and symptoms,
+                  accompanied by exact bottle packaging counts, water dilution volumes, and pollinator safety gating.
                 </p>
               </div>
             </div>
 
-            {/* Geolocation Section (Optional) */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                  <MapPin className="w-4 h-4 text-[#d96b27]" />
-                  <span>Geolocation / Agricultural Region (Optional)</span>
-                </label>
-                <span className="text-[10px] text-slate-400 font-medium">Optional</span>
-              </div>
-
-              {/* Quick Pick Pills */}
-              {optionsData?.suggested_regions && (
-                <div className="flex flex-wrap gap-1.5">
-                  {optionsData.suggested_regions.map((reg) => (
-                    <button
-                      key={reg}
-                      type="button"
-                      onClick={() => setGeolocation(geolocation === reg ? '' : reg)}
-                      className={`text-[11px] font-medium px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
-                        geolocation === reg
-                          ? 'bg-[#d96b27] text-white border-[#d96b27] shadow-xs'
-                          : 'bg-[#fbf9f5] border-[#eae4dc] text-slate-700 hover:bg-white hover:border-[#d96b27]/40'
-                      }`}
-                    >
-                      {reg}
-                    </button>
-                  ))}
+            {/* MANDATORY SECTION: Core Farmer Problem & Phenology */}
+            <div className="space-y-6">
+              <div className="flex items-center justify-between pb-2 border-b border-[#eae4dc]">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-[#d96b27] text-white">
+                    <Activity className="w-4 h-4" />
+                  </div>
+                  <h4 className="text-sm font-extrabold text-slate-900">
+                    Farmer Problem — Quick Diagnosis Intake
+                  </h4>
                 </div>
-              )}
-
-              <input
-                type="text"
-                value={geolocation}
-                onChange={(e) => setGeolocation(e.target.value)}
-                placeholder="Or type a custom agricultural zone or district (e.g. Nashik, Guntur, Punjab North)..."
-                className="w-full bg-[#fbf9f5] border border-[#eae4dc] rounded-xl px-3.5 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#d96b27]/30 focus:border-[#d96b27]"
-              />
-            </div>
-
-            {/* Season Section (Optional) */}
-            <div className="space-y-3 pt-4 border-t border-[#eae4dc]">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4 text-[#d96b27]" />
-                  <span>Crop Season / Meteorological Stage (Optional)</span>
-                </label>
-                <span className="text-[10px] text-slate-400 font-medium">Optional</span>
+                <span className="text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  Required for Precision Guidance
+                </span>
               </div>
 
-              {optionsData?.suggested_seasons && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                  {optionsData.suggested_seasons.map((s) => {
-                    const isSelected = season === s.name;
+              {/* 1. Crop Growth Stage */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <Sprout className="w-3.5 h-3.5 text-[#d96b27]" />
+                    <span>1. Crop Growth Stage</span>
+                  </label>
+                  <span className="text-[10px] text-[#d96b27] font-semibold">
+                    {growthStage === 'Flowering' ? '⚠️ Activates Pollinator Safety Gating' : growthStage === 'Fruiting / Maturation' ? '⏱️ Activates Pre-Harvest Interval (PHI)' : 'Growth Phenology'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { label: 'Seedling', icon: '🌱', desc: 'Tender nursery / early root establishment' },
+                    { label: 'Vegetative', icon: '🌿', desc: 'Active tillering, branch & canopy flush' },
+                    { label: 'Flowering', icon: '🌸', desc: 'Bud formation & active pollination (Bee safety)' },
+                    { label: 'Fruiting / Maturation', icon: '🍎', desc: 'Pod/fruit set & ripening (Residue safety)' },
+                  ].map((stage) => {
+                    const isSel = growthStage === stage.label;
                     return (
-                      <div
-                        key={s.name}
-                        onClick={() => setSeason(isSelected ? '' : s.name)}
-                        className={`p-3 rounded-xl border cursor-pointer transition-all ${
-                          isSelected
+                      <button
+                        key={stage.label}
+                        type="button"
+                        onClick={() => setGrowthStage(stage.label)}
+                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                          isSel
                             ? 'bg-[#fdf3ed] border-[#d96b27] shadow-xs'
                             : 'bg-[#fbf9f5] border-[#eae4dc] hover:bg-white hover:border-[#d96b27]/40'
                         }`}
                       >
                         <div className="flex items-center justify-between">
-                          <span
-                            className={`text-xs font-bold ${
-                              isSelected ? 'text-[#d96b27]' : 'text-slate-800'
-                            }`}
-                          >
-                            {s.name}
-                          </span>
-                          {isSelected && <Check className="w-3.5 h-3.5 text-[#d96b27]" />}
+                          <span className="text-sm">{stage.icon}</span>
+                          {isSel && <Check className="w-3.5 h-3.5 text-[#d96b27]" />}
                         </div>
-                        <p className="text-[11px] text-slate-500 mt-1 leading-snug">
-                          {s.description}
-                        </p>
-                      </div>
+                        <div className={`text-xs font-extrabold mt-1.5 ${isSel ? 'text-[#d96b27]' : 'text-slate-800'}`}>
+                          {stage.label}
+                        </div>
+                        <div className="text-[10px] text-slate-500 mt-0.5 leading-snug">
+                          {stage.desc}
+                        </div>
+                      </button>
                     );
                   })}
+                </div>
+              </div>
+
+              {/* 2. When First Observed (Onset) */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-[#d96b27]" />
+                    <span>2. When First Observed (Symptom Onset)</span>
+                  </label>
+                  <span className="text-[10px] text-slate-400 font-medium">Infection Timeline</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {[
+                    { label: '1-2 days ago (Acute)', badge: 'Acute Onset', desc: 'Immediate intervention window for maximum knockdown' },
+                    { label: '3-7 days ago', badge: 'Progressive', desc: 'Secondary lesion growth & established infection' },
+                    { label: '>1 week ago', badge: 'Chronic / Severe', desc: 'Chronic spread — triggers agronomist escalation' },
+                  ].map((onset) => {
+                    const isSel = onsetDays === onset.label;
+                    return (
+                      <button
+                        key={onset.label}
+                        type="button"
+                        onClick={() => setOnsetDays(onset.label)}
+                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                          isSel
+                            ? 'bg-[#fdf3ed] border-[#d96b27] shadow-xs'
+                            : 'bg-[#fbf9f5] border-[#eae4dc] hover:bg-white hover:border-[#d96b27]/40'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className={`text-xs font-extrabold ${isSel ? 'text-[#d96b27]' : 'text-slate-800'}`}>
+                            {onset.label}
+                          </span>
+                          {isSel && <Check className="w-3.5 h-3.5 text-[#d96b27]" />}
+                        </div>
+                        <p className="text-[10px] text-slate-500 mt-1 leading-snug">
+                          {onset.desc}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 3. Recent Climate & Weather */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <Droplets className="w-3.5 h-3.5 text-[#d96b27]" />
+                    <span>3. Recent Microclimate & Weather (Last 48–72h)</span>
+                  </label>
+                  <span className="text-[10px] text-[#d96b27] font-semibold">
+                    {recentWeather.includes('Rainy') ? '💧 Recommends Spreader-Sticker Tank Mix' : 'Rainfastness & Evaporation Calibration'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { label: 'Clear & Dry', icon: '☀️', desc: 'Low moisture, normal evapotranspiration' },
+                    { label: 'Rainy / High Humidity', icon: '🌧️', desc: 'Wet foliage, requires non-ionic sticker adjuvant' },
+                    { label: 'High Heat (>32°C)', icon: '🌡️', desc: 'Foliar scorch risk; early morning spray only' },
+                    { label: 'Overcast / Windy', icon: '💨', desc: 'High drift risk; calibrate nozzle droplet size' },
+                  ].map((w) => {
+                    const isSel = recentWeather === w.label;
+                    return (
+                      <button
+                        key={w.label}
+                        type="button"
+                        onClick={() => setRecentWeather(w.label)}
+                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                          isSel
+                            ? 'bg-[#fdf3ed] border-[#d96b27] shadow-xs'
+                            : 'bg-[#fbf9f5] border-[#eae4dc] hover:bg-white hover:border-[#d96b27]/40'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">{w.icon}</span>
+                          {isSel && <Check className="w-3.5 h-3.5 text-[#d96b27]" />}
+                        </div>
+                        <div className={`text-xs font-extrabold mt-1.5 ${isSel ? 'text-[#d96b27]' : 'text-slate-800'}`}>
+                          {w.label}
+                        </div>
+                        <div className="text-[10px] text-slate-500 mt-0.5 leading-snug">
+                          {w.desc}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 4. Previous Treatment History */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-[#d96b27]" />
+                    <span>4. Previous Chemical Treatment History</span>
+                  </label>
+                  <span className="text-[10px] text-[#d96b27] font-semibold">
+                    {previousTreatment.includes('Ineffective') ? '⚠️ Activates Mode-of-Action Resistance Rotation' : 'Anti-Resistance Protocol'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {[
+                    { label: 'None (First Spray)', desc: 'Initial curative/preventive spray on naive crop' },
+                    { label: 'Already Sprayed - Ineffective', desc: 'Prior chemical failed. Strictly rotates active ingredient group' },
+                    { label: 'Rotational Spray', desc: 'Sequential follow-up spray adhering to IPM rotation' },
+                  ].map((treat) => {
+                    const isSel = previousTreatment === treat.label;
+                    return (
+                      <button
+                        key={treat.label}
+                        type="button"
+                        onClick={() => setPreviousTreatment(treat.label)}
+                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                          isSel
+                            ? 'bg-[#fdf3ed] border-[#d96b27] shadow-xs'
+                            : 'bg-[#fbf9f5] border-[#eae4dc] hover:bg-white hover:border-[#d96b27]/40'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className={`text-xs font-extrabold ${isSel ? 'text-[#d96b27]' : 'text-slate-800'}`}>
+                            {treat.label}
+                          </span>
+                          {isSel && <Check className="w-3.5 h-3.5 text-[#d96b27]" />}
+                        </div>
+                        <p className="text-[10px] text-slate-500 mt-1 leading-snug">
+                          {treat.desc}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* LOCATION & SEASON CONTEXT SECTION */}
+            <div className="space-y-5 pt-5 border-t border-[#eae4dc]">
+              <div className="flex items-center justify-between pb-1">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-slate-800 text-white">
+                    <Compass className="w-4 h-4" />
+                  </div>
+                  <h4 className="text-sm font-extrabold text-slate-900">
+                    Geographic & Seasonal Climate Context
+                  </h4>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDetectGps}
+                  disabled={isDetectingGps}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-[#d96b27] hover:text-[#c55d1d] bg-[#fdf3ed] border border-[#f5d5c0] px-3 py-1 rounded-xl transition-all cursor-pointer disabled:opacity-50"
+                >
+                  <Locate className={`w-3.5 h-3.5 ${isDetectingGps ? 'animate-spin' : ''}`} />
+                  <span>{isDetectingGps ? 'Detecting GPS...' : 'Auto-Detect GPS Location'}</span>
+                </button>
+              </div>
+
+              {/* Geolocation Input & Quick Picks */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-[#d96b27]" />
+                    <span>Agricultural Region or State</span>
+                  </label>
+                  {gpsCoordinates && (
+                    <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                      GPS: {gpsCoordinates}
+                    </span>
+                  )}
+                </div>
+
+                {optionsData?.suggested_regions && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {optionsData.suggested_regions.map((reg) => (
+                      <button
+                        key={reg}
+                        type="button"
+                        onClick={() => setGeolocation(geolocation === reg ? '' : reg)}
+                        className={`text-[11px] font-medium px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                          geolocation === reg
+                            ? 'bg-[#d96b27] text-white border-[#d96b27] shadow-xs'
+                            : 'bg-[#fbf9f5] border-[#eae4dc] text-slate-700 hover:bg-white hover:border-[#d96b27]/40'
+                        }`}
+                      >
+                        {reg}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <input
+                  type="text"
+                  value={geolocation}
+                  onChange={(e) => setGeolocation(e.target.value)}
+                  placeholder="Or enter agricultural district (e.g. Nashik, Guntur, Bhatinda, Warangal)..."
+                  className="w-full bg-[#fbf9f5] border border-[#eae4dc] rounded-xl px-3.5 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#d96b27]/30 focus:border-[#d96b27]"
+                />
+              </div>
+
+              {/* Season Selection Cards */}
+              <div className="space-y-2 pt-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-[#d96b27]" />
+                  <span>Crop Season</span>
+                </label>
+
+                {optionsData?.suggested_seasons && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                    {optionsData.suggested_seasons.map((s) => {
+                      const isSelected = season === s.name;
+                      return (
+                        <div
+                          key={s.name}
+                          onClick={() => setSeason(isSelected ? '' : s.name)}
+                          className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                            isSelected
+                              ? 'bg-[#fdf3ed] border-[#d96b27] shadow-xs'
+                              : 'bg-[#fbf9f5] border-[#eae4dc] hover:bg-white hover:border-[#d96b27]/40'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className={`text-xs font-bold ${isSelected ? 'text-[#d96b27]' : 'text-slate-800'}`}>
+                              {s.name}
+                            </span>
+                            {isSelected && <Check className="w-3.5 h-3.5 text-[#d96b27]" />}
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-1 leading-snug">
+                            {s.description}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* COLLAPSIBLE EXTENDED AGRONOMY PROFILE (Optional) */}
+            <div className="pt-2 border-t border-[#eae4dc]">
+              <button
+                type="button"
+                onClick={() => setShowExtendedFields(!showExtendedFields)}
+                className="w-full py-3 px-4 rounded-xl bg-[#fbf9f5] hover:bg-[#fdf3ed] border border-[#eae4dc] text-xs font-bold text-slate-800 hover:text-[#d96b27] transition-all flex items-center justify-between cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <Sliders className="w-4 h-4 text-[#d96b27]" />
+                  <span>Extended Agronomy & Acreage Dosage Calculator (Optional)</span>
+                  <span className="text-[10px] font-normal text-slate-500">
+                    (+ Acreage Bottle Packs, Sowing Date, Variety, Plant Parts, Notes)
+                  </span>
+                </div>
+                {showExtendedFields ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+
+              {showExtendedFields && (
+                <div className="mt-4 p-5 rounded-2xl border border-[#eae4dc] bg-[#fbf9f5] space-y-5 animate-in fade-in duration-200">
+                  {/* Acreage & Dilution Feature Card */}
+                  <div className="p-3 bg-white rounded-xl border border-[#f5d5c0] flex items-start gap-3">
+                    <Beaker className="w-5 h-5 text-[#d96b27] shrink-0 mt-0.5" />
+                    <div className="text-xs space-y-0.5">
+                      <span className="font-extrabold text-[#d96b27]">Automatic Commercial Bottle & Dilution Calculator:</span>
+                      <p className="text-slate-600">
+                        Entering your field acreage computes total chemical volume (ml/gm), commercial pack bottle counts to buy at your local agrochemical dealer, and knapsack water dilution tanks!
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {/* Area Sown */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-slate-700 uppercase">
+                        Field Area Sown / Affected
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0.1"
+                          max="500"
+                          value={areaSown}
+                          onChange={(e) => setAreaSown(e.target.value)}
+                          placeholder="e.g. 2.5"
+                          className="w-full bg-white border border-[#eae4dc] rounded-xl px-3 py-2 text-xs text-slate-800 font-bold focus:outline-none focus:ring-2 focus:ring-[#d96b27]/30"
+                        />
+                        <select
+                          value={areaUnit}
+                          onChange={(e) => setAreaUnit(e.target.value as any)}
+                          className="bg-white border border-[#eae4dc] rounded-xl px-2.5 py-2 text-xs text-slate-800 font-bold focus:outline-none"
+                        >
+                          <option value="acres">Acres</option>
+                          <option value="hectares">Hectares</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Sowing / Transplanting Date */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-slate-700 uppercase">
+                        Transplanting / Sowing Date
+                      </label>
+                      <input
+                        type="date"
+                        value={sowingDate}
+                        onChange={(e) => setSowingDate(e.target.value)}
+                        className="w-full bg-white border border-[#eae4dc] rounded-xl px-3 py-2 text-xs text-slate-800 font-medium focus:outline-none"
+                      />
+                    </div>
+
+                    {/* Crop Variety / Hybrid */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-slate-700 uppercase">
+                        Crop Variety / Hybrid Name
+                      </label>
+                      <input
+                        type="text"
+                        value={cropVariety}
+                        onChange={(e) => setCropVariety(e.target.value)}
+                        placeholder="e.g. BT-2 Cotton, Pusa Basmati, US-7067"
+                        className="w-full bg-white border border-[#eae4dc] rounded-xl px-3 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Plant Parts Affected */}
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-slate-700 uppercase block">
+                      Plant Parts Exhibiting Symptoms
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {['Leaf', 'Stem', 'Flower', 'Fruit / Pod', 'Root / Collar', 'Whole Plant Canopy'].map((part) => {
+                        const isChecked = plantPartsAffected.includes(part);
+                        return (
+                          <button
+                            key={part}
+                            type="button"
+                            onClick={() => {
+                              if (isChecked) {
+                                setPlantPartsAffected(plantPartsAffected.filter((p) => p !== part));
+                              } else {
+                                setPlantPartsAffected([...plantPartsAffected, part]);
+                              }
+                            }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer flex items-center gap-1.5 ${
+                              isChecked
+                                ? 'bg-[#d96b27] text-white border-[#d96b27]'
+                                : 'bg-white border-[#eae4dc] text-slate-700 hover:border-[#d96b27]/40'
+                            }`}
+                          >
+                            {isChecked ? <CheckSquare className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
+                            <span>{part}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Irrigation Condition */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-slate-700 uppercase block">
+                        Irrigation & Soil Moisture Condition
+                      </label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {['Normal', 'Waterlogged / Flooded', 'Drought Stressed'].map((cond) => (
+                          <button
+                            key={cond}
+                            type="button"
+                            onClick={() => setIrrigationCondition(cond)}
+                            className={`p-2 rounded-lg text-[11px] font-bold border transition-all ${
+                              irrigationCondition === cond
+                                ? 'bg-[#d96b27] text-white border-[#d96b27]'
+                                : 'bg-white border-[#eae4dc] text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            {cond}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Severity Level */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-slate-700 uppercase block">
+                        Observed Severity Level
+                      </label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {['Mild (<10%)', 'Moderate (10-30%)', 'Severe (>30%)'].map((sev) => (
+                          <button
+                            key={sev}
+                            type="button"
+                            onClick={() => setSeverityLevel(sev)}
+                            className={`p-2 rounded-lg text-[11px] font-bold border transition-all ${
+                              severityLevel === sev
+                                ? 'bg-[#d96b27] text-white border-[#d96b27]'
+                                : 'bg-white border-[#eae4dc] text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            {sev}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Farmer Contact & Notes */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-slate-700 uppercase">
+                        Farmer Name & Phone (Optional)
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          value={farmerName}
+                          onChange={(e) => setFarmerName(e.target.value)}
+                          placeholder="Farmer Name"
+                          className="bg-white border border-[#eae4dc] rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none"
+                        />
+                        <input
+                          type="tel"
+                          value={farmerPhone}
+                          onChange={(e) => setFarmerPhone(e.target.value)}
+                          placeholder="Phone Number"
+                          className="bg-white border border-[#eae4dc] rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-slate-700 uppercase">
+                        Farmer Notes / Specific Field Observations
+                      </label>
+                      <textarea
+                        rows={1}
+                        value={farmerNotes}
+                        onChange={(e) => setFarmerNotes(e.target.value)}
+                        placeholder="Any additional observations (e.g. soil type, fertilizer applied, neighboring fields)..."
+                        className="w-full bg-white border border-[#eae4dc] rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none"
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -576,7 +1084,7 @@ export const LeafAdvisoryPage: React.FC = () => {
                 disabled={isGenerating}
                 className="w-full sm:w-auto px-5 py-2.5 bg-white border border-[#e5ded3] hover:bg-warmgray-50 text-warmgray-700 rounded-xl text-xs font-bold transition-colors shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
               >
-                <span>Skip Optional Context & Generate</span>
+                <span>Quick Generate (Standard Label Rate)</span>
               </button>
 
               <button
@@ -588,12 +1096,12 @@ export const LeafAdvisoryPage: React.FC = () => {
                 {isGenerating ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Synthesizing Advisory...</span>
+                    <span>Synthesizing Precision Advisory...</span>
                   </>
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4" />
-                    <span>Generate Agronomist Advisory</span>
+                    <span>Generate Agronomist Advisory & Dosage</span>
                   </>
                 )}
               </button>
@@ -666,6 +1174,101 @@ export const LeafAdvisoryPage: React.FC = () => {
               </button>
             </div>
           </div>
+
+          {/* Escalation Alert Banner (High Risk Triggers) */}
+          {advisoryResult.escalation_required && (
+            <div className="p-4 bg-amber-50 border-2 border-amber-300 rounded-2xl flex items-start gap-3.5 shadow-xs animate-in fade-in duration-200">
+              <div className="p-2 rounded-xl bg-amber-500 text-white shrink-0 mt-0.5 shadow-xs">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="text-sm font-black text-amber-950 uppercase tracking-wide">
+                    Agronomic Risk Escalation Required
+                  </h4>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-200 text-amber-900 border border-amber-300">
+                    High Priority Advisory
+                  </span>
+                </div>
+                <p className="text-xs text-amber-900 leading-relaxed font-medium">
+                  {advisoryResult.escalation_reason || 'Severe foliar progression or treatment failure requires immediate expert follow-up.'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Intake Telemetry Bar */}
+          {advisoryResult.intake_summary && (
+            <div className="bg-[#fbf9f5] border border-[#eae4dc] rounded-2xl p-4 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-extrabold text-slate-700 uppercase tracking-wider text-[10px] flex items-center gap-1">
+                  <Activity className="w-3.5 h-3.5 text-[#d96b27]" />
+                  <span>Farmer Problem Telemetry:</span>
+                </span>
+                <span className="px-2 py-0.5 rounded-lg bg-white border border-[#eae4dc] font-semibold text-slate-800">
+                  Stage: <strong>{advisoryResult.intake_summary.growth_stage}</strong>
+                </span>
+                <span className="px-2 py-0.5 rounded-lg bg-white border border-[#eae4dc] font-semibold text-slate-800">
+                  Onset: <strong>{advisoryResult.intake_summary.onset_days}</strong>
+                </span>
+                <span className="px-2 py-0.5 rounded-lg bg-white border border-[#eae4dc] font-semibold text-slate-800">
+                  Weather: <strong>{advisoryResult.intake_summary.recent_weather}</strong>
+                </span>
+                <span className="px-2 py-0.5 rounded-lg bg-white border border-[#eae4dc] font-semibold text-slate-800">
+                  Prior Spray: <strong>{advisoryResult.intake_summary.previous_treatment}</strong>
+                </span>
+                {advisoryResult.intake_summary.area_sown && advisoryResult.intake_summary.area_sown !== 'Not specified' && (
+                  <span className="px-2 py-0.5 rounded-lg bg-[#fdf3ed] border border-[#f5d5c0] font-bold text-[#d96b27]">
+                    Acreage: {advisoryResult.intake_summary.area_sown}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Combination & Tank-Mix Guidance Section */}
+          {advisoryResult.combination_guidance && (
+            <div className="p-4 bg-gradient-to-r from-blue-50 via-[#fdf3ed] to-amber-50 border border-blue-200 rounded-2xl flex items-start gap-3.5 shadow-xs">
+              <div className="p-2.5 rounded-xl bg-blue-600 text-white shrink-0 mt-0.5 shadow-xs">
+                <FlaskConical className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="text-sm font-extrabold text-slate-900">
+                    Scientifically Verified Combination & Tank-Mix Strategy
+                  </h4>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                    Curative + Protective Synergy
+                  </span>
+                </div>
+                <p className="text-xs text-slate-700 leading-relaxed font-medium">
+                  {advisoryResult.combination_guidance}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Acreage Bottle & Dilution Calculator Card */}
+          {advisoryResult.area_calculation_summary && (
+            <div className="p-4 bg-white border border-[#eae4dc] rounded-2xl flex items-start gap-3.5 shadow-xs">
+              <div className="p-2.5 rounded-xl bg-emerald-600 text-white shrink-0 mt-0.5 shadow-xs">
+                <Beaker className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="text-sm font-extrabold text-slate-900">
+                    Field Acreage Dilution & Total Packaging Requirement
+                  </h4>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    Dealer Purchase Ready
+                  </span>
+                </div>
+                <p className="text-xs text-slate-700 leading-relaxed font-medium">
+                  {advisoryResult.area_calculation_summary}
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* 5-KPI Quick Metric Strip */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -1210,25 +1813,44 @@ export const LeafAdvisoryPage: React.FC = () => {
             </div>
 
             {filteredProducts.length === 0 ? (
-              <div className="p-8 text-center bg-[#fbf9f5] border border-[#eae4dc] rounded-xl space-y-2 text-slate-500">
-                <Layers className="w-8 h-8 text-slate-400 mx-auto" />
-                <div className="text-xs font-bold text-slate-700">No products matching the selected filter</div>
-                <p className="text-[11px] text-slate-400">
-                  Try switching back to 'ALL' to view all registered formulations.
-                </p>
-              </div>
+              advisoryResult.nacl_products.length === 0 ? (
+                <div className="p-8 text-center bg-[#fdf3ed] border-2 border-[#f5d5c0] rounded-2xl space-y-3">
+                  <div className="w-12 h-12 rounded-2xl bg-[#d96b27] text-white flex items-center justify-center mx-auto shadow-xs">
+                    <ShieldCheck className="w-6 h-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-black text-slate-900">
+                      Zero-Hallucination Safety Guarantee: No Unverified Chemicals
+                    </h4>
+                    <p className="text-xs text-warmgray-700 max-w-xl mx-auto leading-relaxed">
+                      No registered NACL chemical product in our catalog is specifically licensed for{' '}
+                      <strong>{advisoryResult.disease_name || advisoryResult.pest_name || 'this condition'}</strong> on{' '}
+                      <strong>{advisoryResult.crop_name}</strong>. To protect your crop health, prevent phytotoxicity, and avoid financial loss, our system strictly avoids recommending unverified or off-label chemicals. Please follow the verified cultural, biological, and sanitary remedies detailed below.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-8 text-center bg-[#fbf9f5] border border-[#eae4dc] rounded-xl space-y-2 text-slate-500">
+                  <Layers className="w-8 h-8 text-slate-400 mx-auto" />
+                  <div className="text-xs font-bold text-slate-700">No products matching the selected filter</div>
+                  <p className="text-[11px] text-slate-400">
+                    Try switching back to 'ALL' to view all registered formulations.
+                  </p>
+                </div>
+              )
             ) : productViewMode === 'table' ? (
-              /* MODERN PRODUCT TABLE VIEW */
+              /* MODERN PRODUCT TABLE VIEW WITH ZERO-HALLUCINATION & ACREAGE DOSAGE */
               <div className="overflow-x-auto rounded-xl border border-[#eae4dc] shadow-xs">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-[#fbf9f5] border-b border-[#eae4dc] text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                      <th className="py-3 px-4">Product & Trade Name</th>
-                      <th className="py-3 px-3">Category</th>
-                      <th className="py-3 px-4">Active Chemical Ingredient</th>
+                      <th className="py-3 px-4">Product & Category</th>
+                      <th className="py-3 px-3">Active Chemical</th>
                       <th className="py-3 px-3">Beneficial Rank</th>
-                      <th className="py-3 px-4">Prescribed Field Dosage</th>
-                      <th className="py-3 px-4 text-right">Official Catalog Link</th>
+                      <th className="py-3 px-3">Standard Statutory Label Rate</th>
+                      <th className="py-3 px-4">Field Acreage Requirement & Bottles</th>
+                      <th className="py-3 px-3">Safety & Combination</th>
+                      <th className="py-3 px-4 text-right">Official Link</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#eae4dc] bg-white">
@@ -1239,13 +1861,11 @@ export const LeafAdvisoryPage: React.FC = () => {
                             <span className="w-2 h-2 rounded-full bg-[#d96b27]" />
                             <span>{prod.product_name}</span>
                           </div>
-                        </td>
-                        <td className="py-3.5 px-3">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#fdeade] text-[#d96b27] border border-[#f5d5c0]">
+                          <span className="mt-1 inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#fdeade] text-[#d96b27]">
                             {prod.category}
                           </span>
                         </td>
-                        <td className="py-3.5 px-4 text-slate-600 italic">
+                        <td className="py-3.5 px-3 text-slate-600 italic text-[11px]">
                           {prod.active_ingredient || 'Formulated Agrochemical'}
                         </td>
                         <td className="py-3.5 px-3">
@@ -1263,32 +1883,67 @@ export const LeafAdvisoryPage: React.FC = () => {
                               <span>{prod.benefit_badge}</span>
                             </span>
                           ) : (
-                            <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold border ${
-                              idx === 0
-                                ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                                : idx === 1
-                                ? 'bg-blue-100 text-blue-800 border-blue-200'
-                                : 'bg-slate-100 text-slate-700 border-slate-200'
-                            }`}>
-                              {idx === 0 && <Sparkles className="w-3 h-3 text-emerald-600" />}
-                              <span>{idx === 0 ? 'Rank #1 • Top Pick' : idx === 1 ? 'Rank #2 • High Efficacy' : `Rank #${idx + 1}`}</span>
+                            <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold border bg-emerald-100 text-emerald-800 border-emerald-300">
+                              <Sparkles className="w-3 h-3 text-emerald-600" />
+                              <span>Rank #{idx + 1}</span>
                             </span>
                           )}
                         </td>
-                        <td className="py-3.5 px-4 font-bold text-[#d96b27]">
-                          <span className="px-2.5 py-1 rounded-lg bg-[#fdf3ed] border border-[#f5d5c0] font-mono text-xs">
-                            {prod.recommended_dosage || 'Refer to Product Label'}
+                        <td className="py-3.5 px-3 font-semibold text-slate-800 text-[11px]">
+                          <span className="px-2 py-1 rounded-md bg-[#fbf9f5] border border-[#eae4dc] font-mono block">
+                            {prod.standard_label_dosage || prod.recommended_dosage || 'Refer to Product Label'}
                           </span>
+                        </td>
+                        <td className="py-3.5 px-4 font-bold text-[#d96b27]">
+                          {prod.calculated_total_dosage ? (
+                            <div className="space-y-1">
+                              <div className="text-xs font-black text-[#d96b27]">
+                                Total Needed: {prod.calculated_total_dosage}
+                              </div>
+                              {prod.calculated_bottles && (
+                                <div className="text-[10px] text-slate-700 font-medium">
+                                  Packs: <strong className="text-slate-900">{prod.calculated_bottles}</strong>
+                                </div>
+                              )}
+                              {prod.calculated_total_water && (
+                                <div className="text-[10px] text-blue-700 font-medium">
+                                  {prod.calculated_total_water}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-slate-500 font-medium">
+                              {prod.recommended_dosage || 'Refer to label'}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-3">
+                          <div className="space-y-1 text-[10px]">
+                            {prod.bee_toxicity_warning && (
+                              <span className="inline-block px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 font-bold">
+                                🐝 Evening Spray (Bee Safe)
+                              </span>
+                            )}
+                            <div className="flex items-center gap-1 text-slate-500">
+                              {prod.phi_days && <span className="font-semibold">PHI: {prod.phi_days}d</span>}
+                              {prod.rei_hours && <span className="font-semibold">• REI: {prod.rei_hours}h</span>}
+                            </div>
+                            {prod.combination_partner && (
+                              <div className="text-[10px] text-blue-700 italic max-w-xs truncate" title={prod.combination_partner}>
+                                Mix: {prod.combination_partner}
+                              </div>
+                            )}
+                          </div>
                         </td>
                         <td className="py-3.5 px-4 text-right">
                           <a
                             href={prod.product_url || 'https://naclind.com/products/'}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#eae4dc] hover:border-[#d96b27] text-slate-700 hover:text-[#d96b27] font-bold text-xs transition-all shadow-xs"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white border border-[#eae4dc] hover:border-[#d96b27] text-slate-700 hover:text-[#d96b27] font-bold text-[11px] transition-all shadow-xs"
                           >
-                            <span>View Product</span>
-                            <ExternalLink className="w-3.5 h-3.5" />
+                            <span>Official Page</span>
+                            <ExternalLink className="w-3 h-3" />
                           </a>
                         </td>
                       </tr>
@@ -1297,15 +1952,15 @@ export const LeafAdvisoryPage: React.FC = () => {
                 </table>
               </div>
             ) : (
-              /* MODERN PRODUCT CARD GRID VIEW */
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              /* MODERN PRODUCT CARD GRID VIEW WITH DOSAGE & COMBINATION */
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredProducts.map((prod, idx) => (
                   <div
                     key={prod.product_id}
-                    className="p-4 rounded-xl border border-[#eae4dc] bg-[#fbf9f5] hover:bg-white hover:border-[#d96b27] transition-all shadow-xs flex flex-col justify-between space-y-3 group"
+                    className="p-4 rounded-2xl border border-[#eae4dc] bg-[#fbf9f5] hover:bg-white hover:border-[#d96b27] transition-all shadow-xs flex flex-col justify-between space-y-3.5 group"
                   >
-                    <div>
-                      <div className="flex items-center justify-between text-[11px] mb-1.5 gap-2">
+                    <div className="space-y-2.5">
+                      <div className="flex items-center justify-between text-[11px] gap-2">
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#fdeade] text-[#d96b27]">
                           {prod.category}
                         </span>
@@ -1321,33 +1976,76 @@ export const LeafAdvisoryPage: React.FC = () => {
                             <span>{prod.benefit_badge}</span>
                           </span>
                         ) : (
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 ${
-                            idx === 0
-                              ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                              : 'bg-white text-slate-600 border-slate-200'
-                          }`}>
-                            {idx === 0 && <Sparkles className="w-2.5 h-2.5 text-emerald-600" />}
-                            <span>{idx === 0 ? 'Rank #1 • Top Pick' : `Rank #${idx + 1}`}</span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-emerald-100 text-emerald-800 border-emerald-300">
+                            Rank #{idx + 1}
                           </span>
                         )}
                       </div>
 
-                      <h4 className="text-sm font-extrabold text-slate-900 group-hover:text-[#d96b27] transition-colors">
-                        {prod.product_name}
-                      </h4>
-                      {prod.active_ingredient && (
-                        <p className="text-[11px] text-slate-500 italic mt-0.5">
-                          {prod.active_ingredient}
-                        </p>
+                      <div>
+                        <h4 className="text-base font-black text-slate-900 group-hover:text-[#d96b27] transition-colors">
+                          {prod.product_name}
+                        </h4>
+                        {prod.active_ingredient && (
+                          <p className="text-xs text-slate-500 italic mt-0.5">
+                            {prod.active_ingredient}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Standard Statutory Label Rate */}
+                      <div className="p-2.5 bg-white border border-[#eae4dc] rounded-xl text-xs space-y-0.5">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                          Standard Statutory Label Rate
+                        </span>
+                        <span className="font-bold text-[#d96b27] text-xs font-mono">
+                          {prod.standard_label_dosage || prod.recommended_dosage || 'Refer to product label'}
+                        </span>
+                      </div>
+
+                      {/* Field Acreage Calculation (if computed) */}
+                      {prod.calculated_total_dosage && (
+                        <div className="p-2.5 bg-[#fdf3ed] border border-[#f5d5c0] rounded-xl text-xs space-y-1">
+                          <div className="flex items-center justify-between text-[10px] uppercase font-extrabold text-[#d96b27]">
+                            <span>Field Acreage Requirement</span>
+                            <Beaker className="w-3 h-3 text-[#d96b27]" />
+                          </div>
+                          <div className="text-xs font-black text-slate-900">
+                            Total Volume: {prod.calculated_total_dosage}
+                          </div>
+                          {prod.calculated_bottles && (
+                            <div className="text-[11px] text-slate-700 font-medium">
+                              Dealer Packaging: <strong>{prod.calculated_bottles}</strong>
+                            </div>
+                          )}
+                          {prod.calculated_total_water && (
+                            <div className="text-[10px] text-blue-700 font-medium">
+                              Water: {prod.calculated_total_water}
+                            </div>
+                          )}
+                        </div>
                       )}
 
-                      <div className="mt-3 p-2.5 bg-white border border-[#eae4dc] rounded-lg text-xs space-y-1">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                          Recommended Dosage
-                        </span>
-                        <span className="font-bold text-[#d96b27] text-[11px] font-mono">
-                          {prod.recommended_dosage || 'Refer to product label'}
-                        </span>
+                      {/* Safety & Combination Partner */}
+                      <div className="space-y-1.5 pt-1 text-xs">
+                        {prod.combination_partner && (
+                          <div className="p-2 rounded-lg bg-blue-50 border border-blue-200 text-[11px] text-blue-900 leading-snug">
+                            <strong>Recommended Mix:</strong> {prod.combination_partner}
+                          </div>
+                        )}
+
+                        {prod.bee_toxicity_warning && (
+                          <div className="p-1.5 rounded-lg bg-amber-50 border border-amber-200 text-[10px] text-amber-900 font-medium flex items-center gap-1.5">
+                            <span>🐝</span>
+                            <span>{prod.bee_toxicity_warning}</span>
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1">
+                          <span>PHI: <strong>{prod.phi_days ? `${prod.phi_days} Days` : 'Label'}</strong></span>
+                          <span>REI: <strong>{prod.rei_hours ? `${prod.rei_hours} Hours` : '24h'}</strong></span>
+                          <span>FRAC: <strong>Registered</strong></span>
+                        </div>
                       </div>
                     </div>
 
@@ -1355,9 +2053,9 @@ export const LeafAdvisoryPage: React.FC = () => {
                       href={prod.product_url || 'https://naclind.com/products/'}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center justify-between text-xs font-bold text-[#d96b27] hover:text-[#c55d1d] pt-2 border-t border-[#eae4dc] transition-colors"
+                      className="inline-flex items-center justify-between text-xs font-bold text-[#d96b27] hover:text-[#c55d1d] pt-2.5 border-t border-[#eae4dc] transition-colors"
                     >
-                      <span>View Official Product</span>
+                      <span>View Official Product Page</span>
                       <ExternalLink className="w-3.5 h-3.5" />
                     </a>
                   </div>

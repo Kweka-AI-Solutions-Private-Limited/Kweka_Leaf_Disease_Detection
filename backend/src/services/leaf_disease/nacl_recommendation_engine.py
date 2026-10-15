@@ -314,35 +314,8 @@ class NACLRecommendationEngine:
                 recommendations.append(rec)
                 seen_ids.add(p_id)
 
-        # Step 3B: Fallback Category Match (Ensures recommendations are NEVER empty when disease is detected)
-        if len(recommendations) < 3:
-            all_cat_prods = query_nacl_products(category=category)
-            for prod in all_cat_prods:
-                p_id = prod.get("product_id")
-                if not p_id or p_id in seen_ids:
-                    continue
-
-                rec = NACLProductRecommendation(
-                    product_id=p_id,
-                    product_name=prod.get("product_name", p_id.title()),
-                    category=prod.get("category", category),
-                    product_url=prod.get("product_url", "https://naclind.com/products/"),
-                    active_ingredient=prod.get("active_ingredient"),
-                    match_type="PRELIMINARY_ADVISORY_MATCH",
-                    verification_status="PRELIMINARY_ADVISORY_MATCH",
-                    dosage_verified=True if prod.get("crop_applications") else False,
-                    recommended_dosage=prod.get("crop_applications", [{}])[0].get("dosage", "Refer to current product label"),
-                    match_rationale=f"NACL {category} product recommended for preliminary management of {disease_name}.",
-                    verification_reason=f"Broad category match for {disease_name}.",
-                    pack_sizes=prod.get("pack_sizes", []),
-                    source_url=prod.get("source_url") or prod.get("product_url"),
-                    source_type="OFFICIAL_NACL_WEBSITE",
-                    frac_group=None
-                )
-                recommendations.append(rec)
-                seen_ids.add(p_id)
-                if len(recommendations) >= 5:
-                    break
+        # Step 3B: Deterministic Verification Complete (Zero Hallucination - Never inject unverified chemicals)
+        # If recommendations is empty, we strictly do NOT inject random off-target products.
 
         # Step 3C: Rank verified remedies by beneficial suitability
         target_str = (disease_name or "").lower()
