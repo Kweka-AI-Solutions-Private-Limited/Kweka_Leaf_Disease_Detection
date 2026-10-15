@@ -268,6 +268,7 @@ async def analyze_unified_test_image(
                     pil_img.save(buf, format="JPEG", quality=80)
                     b64_val = base64.b64encode(buf.getvalue()).decode("utf-8")
                     doc_data["image_url"] = f"data:image/jpeg;base64,{b64_val}"
+                    response_obj.image_url = doc_data["image_url"]
             except Exception:
                 pass
         db["ldd_inspections"].insert_one(doc_data)

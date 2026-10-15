@@ -78,6 +78,9 @@ export const LeafAdvisoryPage: React.FC = () => {
   const [productViewMode, setProductViewMode] = useState<'table' | 'cards'>('table');
   const [productCategoryFilter, setProductCategoryFilter] = useState<string>('ALL');
   const [isImageModalOpen, setIsImageModalOpen] = useState<boolean>(false);
+  const [specimenImageError, setSpecimenImageError] = useState<boolean>(false);
+  const [failedHistoryImages, setFailedHistoryImages] = useState<Record<string, boolean>>({});
+
 
   useEffect(() => {
     fetchHistory();
@@ -94,7 +97,12 @@ export const LeafAdvisoryPage: React.FC = () => {
     if (location.state?.diagnosis) {
       setSelectedDiagnosis(location.state.diagnosis);
       const img = location.state.imageUrl || location.state.diagnosis.image_url || null;
-      if (img) setSpecimenImageUrl(img);
+      if (img && !img.startsWith('blob:')) {
+        setSpecimenImageUrl(img);
+      } else {
+        setSpecimenImageUrl(null);
+      }
+      setSpecimenImageError(false);
       setCurrentStep(2);
       setErrorMessage(null);
     }
@@ -123,11 +131,12 @@ export const LeafAdvisoryPage: React.FC = () => {
 
   const handleSelectExistingDiagnosis = (item: AdvisoryHistoricalDiagnosisItem) => {
     setSelectedDiagnosis(item);
-    if (item.image_url) {
+    if (item.image_url && !item.image_url.startsWith('blob:')) {
       setSpecimenImageUrl(item.image_url);
     } else {
       setSpecimenImageUrl(null);
     }
+    setSpecimenImageError(false);
     setCurrentStep(2);
     setErrorMessage(null);
   };
@@ -140,7 +149,8 @@ export const LeafAdvisoryPage: React.FC = () => {
 
     const geoVal = skipOptional ? null : (geolocation.trim() || null);
     const seasonVal = skipOptional ? null : (season.trim() || null);
-    const resolvedSpecimen = specimenImageUrl || selectedDiagnosis.image_url || null;
+    const candidateImg = specimenImageUrl || selectedDiagnosis.image_url || null;
+    const resolvedSpecimen = candidateImg && !candidateImg.startsWith('blob:') ? candidateImg : null;
 
     try {
       const result = await generateLeafAdvisory({
@@ -175,6 +185,7 @@ export const LeafAdvisoryPage: React.FC = () => {
     setSeason('');
     setAdvisoryResult(null);
     setErrorMessage(null);
+    setSpecimenImageError(false);
     setCurrentStep(1);
   };
 
@@ -208,7 +219,9 @@ export const LeafAdvisoryPage: React.FC = () => {
   }, [advisoryResult, productCategoryFilter]);
 
   // Active specimen image in Step 3
-  const activeSpecimenImage = advisoryResult?.image_url || specimenImageUrl || selectedDiagnosis?.image_url || null;
+  const rawSpecimen = advisoryResult?.image_url || specimenImageUrl || selectedDiagnosis?.image_url || null;
+  const activeSpecimenImage = rawSpecimen && !rawSpecimen.startsWith('blob:') && !specimenImageError ? rawSpecimen : null;
+
 
   return (
     <div className="space-y-6 pb-16 w-full animate-in fade-in duration-300">
@@ -344,11 +357,12 @@ export const LeafAdvisoryPage: React.FC = () => {
                       </div>
 
                       <div className="flex items-start gap-3">
-                        {item.image_url ? (
+                        {item.image_url && !item.image_url.startsWith('blob:') && !failedHistoryImages[item.analysis_id] ? (
                           <div className="w-14 h-14 rounded-lg overflow-hidden border border-[#eae4dc] shrink-0 bg-slate-100">
                             <img
                               src={item.image_url}
                               alt={item.crop_name}
+                              onError={() => setFailedHistoryImages((prev) => ({ ...prev, [item.analysis_id]: true }))}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             />
                           </div>
@@ -761,6 +775,7 @@ export const LeafAdvisoryPage: React.FC = () => {
                       <img
                         src={activeSpecimenImage}
                         alt="Diagnosed Foliar Specimen"
+                        onError={() => setSpecimenImageError(true)}
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                       />
                       {/* Floating Metadata Pill */}

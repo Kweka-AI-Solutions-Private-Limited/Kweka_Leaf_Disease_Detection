@@ -257,7 +257,9 @@ export interface UnifiedTestAnalysisResponse {
   pest?: PestDetectionTestResult;
   cross_validation?: CrossValidationResult;
   notes: string[];
+  image_url?: string | null;
 }
+
 
 
 /**

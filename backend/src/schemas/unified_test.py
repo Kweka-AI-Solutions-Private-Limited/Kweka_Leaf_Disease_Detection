@@ -147,4 +147,6 @@ class UnifiedTestAnalysisResponse(BaseModel):
     pest: Optional[PestDetectionTestResult] = None
     cross_validation: Optional[CrossValidationResult] = None
     notes: List[str] = Field(default_factory=list)
+    image_url: Optional[str] = None
+
 

@@ -109,6 +109,20 @@ class LeafAdvisoryService:
                     summary_parts.append(f"Pest: {pest_name}")
                 summary = " • ".join(summary_parts) if summary_parts else f"Analysis {analysis_id[:8]}"
                 image_url = doc.get("image_url") or doc.get("thumbnail")
+                if image_url and isinstance(image_url, str) and image_url.startswith("blob:"):
+                    # Ephemeral browser blob URL detected; attempt fallback to parent diagnosis
+                    parent_id = doc.get("parent_analysis_id")
+                    image_url = None
+                    if parent_id:
+                        try:
+                            parent_doc = self.db[INSPECTIONS_COLLECTION].find_one({"$or": [{"analysis_id": parent_id}, {"_id": parent_id}]})
+                            if parent_doc:
+                                p_img = parent_doc.get("image_url") or parent_doc.get("thumbnail")
+                                if p_img and isinstance(p_img, str) and not p_img.startswith("blob:"):
+                                    image_url = p_img
+                        except Exception:
+                            pass
+
 
                 items.append(
                     AdvisoryHistoricalDiagnosisItem(
@@ -170,13 +184,22 @@ class LeafAdvisoryService:
         )
 
         image_url = request.image_url
+        # Ephemeral blob URLs from browser memory are invalid for persistence
+        if image_url and isinstance(image_url, str) and image_url.startswith("blob:"):
+            image_url = None
+
         if not image_url and request.analysis_id:
             try:
-                hist_doc = self.db[INSPECTIONS_COLLECTION].find_one({"analysis_id": request.analysis_id})
+                hist_doc = self.db[INSPECTIONS_COLLECTION].find_one({
+                    "$or": [{"analysis_id": request.analysis_id}, {"_id": request.analysis_id}]
+                })
                 if hist_doc:
-                    image_url = hist_doc.get("image_url") or hist_doc.get("thumbnail")
+                    p_img = hist_doc.get("image_url") or hist_doc.get("thumbnail")
+                    if p_img and isinstance(p_img, str) and not p_img.startswith("blob:"):
+                        image_url = p_img
             except Exception:
                 pass
+
 
         return LeafAdvisoryResponse(
             advisory_id=advisory_id,

@@ -102,8 +102,27 @@ def generate_advisory(
     try:
         result = service.generate_advisory(request)
 
+        # Resolve and sanitize persistent specimen image
+        final_img = result.image_url
+        if final_img and isinstance(final_img, str) and final_img.startswith("blob:"):
+            final_img = None
+        if not final_img and request.image_url and isinstance(request.image_url, str) and not request.image_url.startswith("blob:"):
+            final_img = request.image_url
+        if not final_img and request.analysis_id:
+            try:
+                pdoc = db["ldd_inspections"].find_one({
+                    "$or": [{"analysis_id": request.analysis_id}, {"_id": request.analysis_id}]
+                })
+                if pdoc:
+                    p_img = pdoc.get("image_url") or pdoc.get("thumbnail")
+                    if p_img and isinstance(p_img, str) and not p_img.startswith("blob:"):
+                        final_img = p_img
+            except Exception:
+                pass
+
         # 1. Persist to user-isolated collection 'ldd_advisories'
         adv_doc = result.model_dump(mode="json")
+        adv_doc["image_url"] = final_img
         adv_doc["user_id"] = user_id
         adv_doc["created_at"] = datetime.now(timezone.utc)
         try:
@@ -140,7 +159,7 @@ def generate_advisory(
                 "cultural_remedies": result.cultural_remedies,
                 "chemical_management": result.chemical_management,
                 "ai_advisory_summary": result.ai_advisory_summary,
-                "image_url": result.image_url or request.image_url,
+                "image_url": final_img,
                 "parent_analysis_id": request.analysis_id
             }
             db["ldd_inspections"].insert_one(history_entry)

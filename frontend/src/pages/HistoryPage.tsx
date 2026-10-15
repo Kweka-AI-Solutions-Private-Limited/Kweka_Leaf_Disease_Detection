@@ -56,6 +56,41 @@ export const HistoryPage: React.FC = () => {
   const [activeModalTab, setActiveModalTab] = useState<'diagnosis' | 'advisory'>('diagnosis');
   const [enlargedImage, setEnlargedImage] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [brokenImages, setBrokenImages] = useState<Record<string, boolean>>({});
+
+  // Resolves the best persistent specimen image for a scan, with fallback to advisory/parent scan
+  const getResolvedSpecimenImage = React.useCallback(
+    (scan: LeafDiseaseAnalysisResponse | null): string | null => {
+      if (!scan) return null;
+      if (brokenImages[scan.analysis_id]) return null;
+
+      // 1. Direct scan image if valid and not an ephemeral blob:
+      const directImg = scan.image_url;
+      if (directImg && !directImg.startsWith('blob:') && !brokenImages[directImg]) {
+        return directImg;
+      }
+
+      // 2. Advisory sub-document image if present
+      const advImg = scan.advisory?.image_url;
+      if (advImg && !advImg.startsWith('blob:') && !brokenImages[advImg]) {
+        return advImg;
+      }
+
+      // 3. Parent analysis inspection image if linked
+      if (scan.parent_analysis_id) {
+        const parent = scans.find(
+          (s) => s.analysis_id === scan.parent_analysis_id || (s as any)._id === scan.parent_analysis_id
+        );
+        if (parent?.image_url && !parent.image_url.startsWith('blob:') && !brokenImages[parent.image_url]) {
+          return parent.image_url;
+        }
+      }
+
+      return null;
+    },
+    [scans, brokenImages]
+  );
+
 
   const fetchHistory = async () => {
     setLoading(true);
@@ -363,25 +398,47 @@ export const HistoryPage: React.FC = () => {
                 >
                   <div className="flex items-center gap-3.5 min-w-0">
                     {/* Thumbnail Specimen or Icon */}
-                    {scan.image_url ? (
-                      <div className="relative w-12 h-12 rounded-xl overflow-hidden border border-[#eae4dc] shrink-0 bg-warmgray-100">
-                        <img
-                          src={scan.image_url}
-                          alt="Specimen"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                        />
-                      </div>
-                    ) : (
-                      <div
-                        className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 border ${
-                          isAdvisory
-                            ? 'bg-teal-50 text-teal-600 border-teal-200'
-                            : 'bg-[#fdf3ed] text-[#d96b27] border-[#f5d5c0]'
-                        }`}
-                      >
-                        {isAdvisory ? <Stethoscope className="w-6 h-6" /> : <Sprout className="w-6 h-6" />}
-                      </div>
-                    )}
+                    {(() => {
+                      const rowSpecimen = getResolvedSpecimenImage(scan);
+                      if (rowSpecimen) {
+                        return (
+                          <div
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEnlargedImage(rowSpecimen);
+                            }}
+                            className="relative w-12 h-12 rounded-xl overflow-hidden border border-[#eae4dc] shrink-0 bg-warmgray-100 cursor-pointer group/thumb"
+                            title="Click to view high-res specimen"
+                          >
+                            <img
+                              src={rowSpecimen}
+                              alt="Specimen"
+                              onError={() =>
+                                setBrokenImages((prev) => ({
+                                  ...prev,
+                                  [scan.analysis_id]: true,
+                                  [rowSpecimen]: true,
+                                }))
+                              }
+                              className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-200"
+                            />
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div
+                          className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 border ${
+                            isAdvisory
+                              ? 'bg-teal-50 text-teal-600 border-teal-200'
+                              : 'bg-[#fdf3ed] text-[#d96b27] border-[#f5d5c0]'
+                          }`}
+                        >
+                          {isAdvisory ? <Stethoscope className="w-6 h-6" /> : <Sprout className="w-6 h-6" />}
+                        </div>
+                      );
+                    })()}
+
 
                     <div className="min-w-0 space-y-1">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -521,22 +578,54 @@ export const HistoryPage: React.FC = () => {
             {/* Modal Header */}
             <div className="flex items-start justify-between border-b border-[#f1eee9] pb-4 gap-4">
               <div className="flex items-center gap-3.5 min-w-0">
-                {selectedScan.image_url && (
-                  <div
-                    onClick={() => setEnlargedImage(selectedScan.image_url || null)}
-                    className="relative w-16 h-16 rounded-xl overflow-hidden border border-[#eae4dc] bg-warmgray-100 shrink-0 cursor-pointer group/img"
-                    title="Click to enlarge specimen"
-                  >
-                    <img
-                      src={selectedScan.image_url}
-                      alt="Analyzed Specimen"
-                      className="w-full h-full object-cover group-hover/img:scale-110 transition-transform duration-200"
-                    />
-                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-opacity">
-                      <Maximize2 className="w-4 h-4 text-white" />
+                {(() => {
+                  const modalSpecimen = getResolvedSpecimenImage(selectedScan);
+                  const isAdv = selectedScan.source === 'LEAF_ADVISORY';
+
+                  if (modalSpecimen) {
+                    return (
+                      <div
+                        onClick={() => setEnlargedImage(modalSpecimen)}
+                        className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden border border-[#eae4dc] bg-warmgray-100 shrink-0 cursor-pointer group/img shadow-xs"
+                        title="Click to enlarge specimen"
+                      >
+                        <img
+                          src={modalSpecimen}
+                          alt="Analyzed Specimen"
+                          onError={() =>
+                            setBrokenImages((prev) => ({
+                              ...prev,
+                              [selectedScan.analysis_id]: true,
+                              [modalSpecimen]: true,
+                            }))
+                          }
+                          className="w-full h-full object-cover group-hover/img:scale-110 transition-transform duration-200"
+                        />
+                        <div className="absolute inset-0 bg-black/35 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-opacity">
+                          <Maximize2 className="w-5 h-5 text-white" />
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div
+                      className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border flex flex-col items-center justify-center shrink-0 shadow-xs ${
+                        isAdv
+                          ? 'bg-teal-50 text-teal-600 border-teal-200'
+                          : 'bg-[#fdf3ed] text-[#d96b27] border-[#f5d5c0]'
+                      }`}
+                      title="Specimen telemetry record"
+                    >
+                      {isAdv ? (
+                        <Stethoscope className="w-7 h-7 sm:w-8 sm:h-8" />
+                      ) : (
+                        <Sprout className="w-7 h-7 sm:w-8 sm:h-8" />
+                      )}
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
+
                 <div className="min-w-0 space-y-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-[10px] font-bold font-mono text-[#d96b27] uppercase tracking-wider bg-[#fdf3ed] px-2 py-0.5 rounded border border-[#f5d5c0]">
@@ -1101,6 +1190,7 @@ export const HistoryPage: React.FC = () => {
                   type="button"
                   onClick={() => {
                     const s = selectedScan;
+                    const resolvedImg = getResolvedSpecimenImage(s);
                     setSelectedScan(null);
                     navigate('/leaf-advisory', {
                       state: {
@@ -1113,12 +1203,13 @@ export const HistoryPage: React.FC = () => {
                           confidence: s.disease?.confidence || s.crop?.confidence || 0.85,
                           source: s.source || 'LEAF_DIAGNOSIS',
                           timestamp: s.timestamp,
-                          image_url: s.image_url || null,
+                          image_url: resolvedImg || null,
                           summary: `Crop: ${s.crop?.crop_name}${s.disease?.disease_name ? ` • Disease: ${s.disease.disease_name}` : ''}${s.pest?.primary_pest ? ` • Pest: ${s.pest.primary_pest}` : ''}`
                         },
-                        imageUrl: s.image_url || null
+                        imageUrl: resolvedImg || null
                       }
                     });
+
                   }}
                   className="px-4 py-2 rounded-xl bg-[#d96b27] hover:bg-[#c55d1d] active:scale-[0.98] text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
                 >

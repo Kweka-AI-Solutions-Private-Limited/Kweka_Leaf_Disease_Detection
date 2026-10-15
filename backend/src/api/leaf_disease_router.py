@@ -60,8 +60,8 @@ GEMINI_DISEASE_CONFIDENCE_THRESHOLD = 0.15
 
 from bson import ObjectId
 
-def _serialize_leaf_run(doc: dict) -> dict:
-    """Helper to convert BSON ObjectId and datetime to string for FastAPI responses."""
+def _serialize_leaf_run(doc: dict, db: Optional[Database] = None) -> dict:
+    """Helper to convert BSON ObjectId and datetime to string for FastAPI responses, and resolve persistent specimen images."""
     if not doc:
         return doc
     
@@ -92,7 +92,35 @@ def _serialize_leaf_run(doc: dict) -> dict:
         # Ensure timestamp exists
         if not cleaned.get("timestamp"):
             cleaned["timestamp"] = cleaned.get("created_at") or datetime.now(timezone.utc).isoformat()
+
+        # Sanitize image_url: strip ephemeral browser blob URLs
+        img = cleaned.get("image_url")
+        if img and isinstance(img, str) and img.startswith("blob:"):
+            cleaned["image_url"] = None
+            img = None
+
+        # Fallback to advisory sub-document image if root is missing
+        if not img:
+            adv_img = (cleaned.get("advisory") or {}).get("image_url")
+            if adv_img and isinstance(adv_img, str) and not adv_img.startswith("blob:"):
+                cleaned["image_url"] = adv_img
+                img = adv_img
+
+        # Fallback to parent diagnosis specimen if parent_analysis_id exists
+        parent_id = cleaned.get("parent_analysis_id")
+        if not img and parent_id and db is not None:
+            try:
+                pdoc = db[INSPECTIONS_COLLECTION].find_one({
+                    "$or": [{"analysis_id": parent_id}, {"_id": parent_id}]
+                })
+                if pdoc:
+                    p_img = pdoc.get("image_url") or pdoc.get("thumbnail")
+                    if p_img and isinstance(p_img, str) and not p_img.startswith("blob:"):
+                        cleaned["image_url"] = p_img
+            except Exception:
+                pass
     return cleaned
+
 
 
 @router.post("/analyze", response_model=LeafDiseaseAnalysisResponse)
@@ -266,6 +294,7 @@ async def analyze_leaf_disease(
                         pil_img.save(buf, format="JPEG", quality=80)
                         b64_val = base64.b64encode(buf.getvalue()).decode("utf-8")
                         doc_data["image_url"] = f"data:image/jpeg;base64,{b64_val}"
+                        resp.image_url = doc_data["image_url"]
                 except Exception:
                     pass
             db[INSPECTIONS_COLLECTION].insert_one(doc_data)
@@ -385,7 +414,7 @@ def get_leaf_disease_history(
         query["crop.crop_name"] = crop_name
 
     cursor = db[INSPECTIONS_COLLECTION].find(query).sort("created_at", -1).limit(limit)
-    runs = [_serialize_leaf_run(doc) for doc in cursor]
+    runs = [_serialize_leaf_run(doc, db=db) for doc in cursor]
     return runs
 
 
@@ -407,7 +436,7 @@ def get_leaf_disease_run(
     doc = db[INSPECTIONS_COLLECTION].find_one(query)
     if not doc:
         raise HTTPException(status_code=404, detail=f"Leaf disease run with ID '{analysis_id}' not found.")
-    return _serialize_leaf_run(doc)
+    return _serialize_leaf_run(doc, db=db)
 
 
 @router.delete("/history/{analysis_id}")

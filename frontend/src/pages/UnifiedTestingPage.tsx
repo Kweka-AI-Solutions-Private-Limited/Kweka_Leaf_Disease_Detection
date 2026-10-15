@@ -1809,8 +1809,20 @@ export const UnifiedTestingPage: React.FC = () => {
             </div>
             <button
               type="button"
-              onClick={() => {
-                const specimenImg = previewUrls[0] || null;
+              onClick={async () => {
+                let specimenImg = analysisResult.image_url || null;
+                if (!specimenImg && selectedFiles.length > 0) {
+                  try {
+                    specimenImg = await new Promise<string>((resolve, reject) => {
+                      const reader = new FileReader();
+                      reader.onload = () => resolve(reader.result as string);
+                      reader.onerror = reject;
+                      reader.readAsDataURL(selectedFiles[0]);
+                    });
+                  } catch {
+                    specimenImg = null;
+                  }
+                }
                 navigate('/leaf-advisory', {
                   state: {
                     inspection_id: analysisResult.analysis_id,

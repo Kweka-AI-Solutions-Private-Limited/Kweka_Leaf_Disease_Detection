@@ -96,4 +96,6 @@ class LeafDiseaseAnalysisResponse(BaseModel):
     nacl_recommendations: Optional[ProductRecommendationResult] = None
     retry_guidance: Optional[str] = None
     phase_notice: str = "Phase 1: Evidence-First Leaf Disease Detection (Strict Confidence >70%)."
+    image_url: Optional[str] = None
+
 
