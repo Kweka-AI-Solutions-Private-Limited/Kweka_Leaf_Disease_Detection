@@ -406,24 +406,36 @@ class LeafAdvisoryService:
             else:
                 r.phi_days = 14
 
-            # 4. Combination / Tank-Mix Partner Recommendation
+            # 4. Combination / Tank-Mix Partner Recommendation (Strict Non-Contradictory Policy)
             p_name_lower = r.product_name.lower()
             p_ai_lower = (r.active_ingredient or "").lower()
             weather_clean = (request.recent_weather or "").lower()
 
             if "kadak" in p_name_lower or ("azoxystrobin" in p_ai_lower and "chlorothalonil" in p_ai_lower):
-                r.combination_partner = "Pre-formulated dual-action (Azoxystrobin + Chlorothalonil) — built-in systemic translaminar and multi-site contact barrier."
+                r.combination_partner = (
+                    "Factory Pre-Mix (Zero Tank Conflict): Pre-formulated Azoxystrobin + Chlorothalonil provides built-in "
+                    "systemic translaminar and multi-site contact protection. Do NOT add other fungicides to the tank."
+                )
             elif any(s in p_ai_lower for s in ("carbendazim", "hexaconazole", "thifluzamide")) or "zen" in p_name_lower or "mass" in p_name_lower or "kazan" in p_name_lower:
-                r.combination_partner = "Tank-mix with Mancozeb (Zeb) @ 2 gm/L for synergistic systemic + multi-site contact protection and anti-resistance."
+                r.combination_partner = (
+                    "Compatible Synergistic Tank-Mix: Mix this systemic product with Mancozeb 75% WP (Zeb) @ 2.0–2.5 gm/L water. "
+                    "Mixing Order: Dissolve Mancozeb powder completely in 50% water first, then add the liquid product. Agitate thoroughly."
+                )
             elif r.category == "Fungicide":
-                r.combination_partner = "Tank-mix with broad-spectrum contact protectant (Mancozeb or Copper Oxychloride) for extended residual control."
+                r.combination_partner = (
+                    "Sequential Application (Do NOT Tank-Mix): To avoid physical incompatibility or chemical scorch, "
+                    "apply this product first as a standalone spray. If follow-up protection is needed, apply Mancozeb 75% WP @ 2.0 gm/L "
+                    "separately 7–10 days later. Do not mix concentrates directly in the same tank."
+                )
+            else:
+                r.combination_partner = (
+                    "Standalone Target Application: Apply strictly as an individual foliar spray at official label rates. "
+                    "Avoid multi-chemical tank mixing to eliminate phytotoxicity risks."
+                )
 
             if any(w in weather_clean for w in ("rain", "humid", "overcast", "wet")):
-                adjuvant_note = "Wet weather: Add non-ionic spreader/sticker (organosilicone adjuvant @ 0.5 ml/L) for rainfastness."
-                if r.combination_partner:
-                    r.combination_partner += f" | {adjuvant_note}"
-                else:
-                    r.combination_partner = adjuvant_note
+                adjuvant_note = "Rainy/Humid Adjuvant: Add 0.5 ml/L non-ionic organosilicone spreader/sticker as the FINAL component after chemicals are fully dissolved."
+                r.combination_partner = f"{r.combination_partner} | {adjuvant_note}"
 
             # 5. Acreage-based calculations (only if acreage provided)
             if acres and acres > 0:
@@ -686,9 +698,13 @@ VERIFIED NACL AGROCHEMICAL CATALOG REMEDIES (Deterministically verified for this
 CRITICAL AGRONOMIC SAFETY & ZERO-HALLUCINATION DIRECTIVES:
 1. NEVER INVENT OR HALLUCINATE CHEMICAL PRODUCTS. Recommending the wrong chemical causes severe crop damage (phytotoxicity), kills pollinating bees, or leaves farmers with ruined harvests.
 2. If verified NACL products ARE listed above:
-   - Base chemical recommendations strictly on the provided list.
+   - Base chemical recommendations strictly on the provided list and their registered label claims.
    - Detail how to use the Rank #1 remedy and when to rotate.
-   - If a combination is beneficial (e.g. systemic + contact tank mix, or adding an agricultural spreader-sticker in wet weather, or rotating chemical class due to prior ineffective treatment), explain it clearly.
+   - COMBINATIONS & TANK-MIX SAFETY RULES:
+     * When suggesting combinations of multiple products (e.g., using X ml/L of one product with Y gm/L of another), make sure those combos are strictly non-contradictory, physically compatible, and chemically safe (e.g. systemic fungicide + Mancozeb contact protectant, or non-ionic sticker adjuvant @ 0.5 ml/L in wet weather).
+     * Mixing Order: Always dissolve powders (WP/WDG) first, followed by liquid suspensions (SC/EC), and adjuvants last.
+     * CRITICAL: If you are NOT 100% confident about the tank-mix compatibility of two products, DO NOT suggest mixing them in the same spray tank! Instead, mention them STRICTLY SEPARATELY as a sequential spray schedule (e.g., "Apply Product A on Day 1; if needed, spray Product B separately after 7–10 days").
+     * Never advise tank-mixing copper or sulfur with incompatible emulsifiable concentrates or alkaline sprays.
 3. If NO registered products are listed:
    - State honestly and transparently that no registered NACL agrochemical directly targets this specific condition on this host crop.
    - DO NOT suggest random chemical brand names.
